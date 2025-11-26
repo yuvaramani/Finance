@@ -3,14 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 import { Button } from "@components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,6 +14,8 @@ import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Plus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
 import { projectService } from "@api/services/projectService";
+import { Grid, GridItem } from "@components/common/Grid";
+import { DataTable, Column } from "@components/DataTable";
 
 interface Project {
   id: number;
@@ -137,8 +131,21 @@ export function ProjectList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const columns: Column<Project>[] = [
+    {
+      header: "Project Name",
+      accessor: "name",
+      cellClassName: "text-green-800",
+    },
+    {
+      header: "Status",
+      accessor: (project) => (project.status || "active").charAt(0).toUpperCase() + (project.status || "active").slice(1),
+      cellClassName: "text-green-700 capitalize",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Projects</h1>
@@ -168,74 +175,31 @@ export function ProjectList() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-          <span className="ml-3 text-green-700">Loading projects...</span>
-        </div>
-      ) : isError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p className="font-medium">Error loading projects</p>
-          <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
-        </div>
-      ) : (
-        <div className="border border-green-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                <TableHead className="text-green-800">Project Name</TableHead>
-                <TableHead className="text-green-800">Status</TableHead>
-                <TableHead className="text-green-800 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProjects.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-green-600">
-                    No projects found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredProjects.map((project) => (
-                  <TableRow
-                    key={project.id}
-                    className="group hover:bg-green-50/30 transition-colors cursor-pointer [&:hover_.action-buttons]:opacity-100"
-                    onDoubleClick={() => handleEdit(project)}
-                  >
-                    <TableCell className="text-green-800">{project.name}</TableCell>
-                    <TableCell className="text-green-700 capitalize">
-                      {project.status || "active"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() => handleEdit(project)}
-                          title="Edit Project"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDelete(project)}
-                          title="Delete Project"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full border border-green-100 rounded flex items-center justify-center">
+            <div className="flex items-center gap-3 text-green-700">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <span>Loading projects...</span>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="h-full border border-red-200 rounded bg-red-50 p-4 text-red-700">
+            <p className="font-medium">Error loading projects</p>
+            <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
+          </div>
+        ) : (
+          <DataTable
+            data={filteredProjects}
+            columns={columns}
+            getRowKey={(project) => project.id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRowDoubleClick={handleEdit}
+            emptyMessage="No projects found"
+          />
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[450px] bg-white border-green-200 shadow-xl rounded-sm">
@@ -249,8 +213,8 @@ export function ProjectList() {
                 : "Provide the project information"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label htmlFor="projectName" className="text-green-800 flex items-center gap-1.5">
                 Project Name <span className="text-red-500">*</span>
               </Label>
@@ -261,8 +225,8 @@ export function ProjectList() {
                 placeholder="Enter project name"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"

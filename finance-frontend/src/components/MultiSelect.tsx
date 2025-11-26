@@ -46,9 +46,13 @@ export function MultiSelect({
     onChange(selected.filter((item) => item !== option));
   };
 
-  const filteredOptions = options.filter((option) =>
-    option.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOptions = options.filter((option) => {
+    // Search in the display name part (after ':') if format is "ID:Name"
+    const searchText = option.includes(':') 
+      ? option.split(':').slice(1).join(':').toLowerCase()
+      : option.toLowerCase();
+    return searchText.includes(searchQuery.toLowerCase());
+  });
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -65,25 +69,29 @@ export function MultiSelect({
           {selected.length === 0 ? (
             <span className="text-green-600/60">{placeholder}</span>
           ) : (
-            selected.map((item) => (
-              <Badge
-                key={item}
-                variant="outline"
-                className="bg-green-50 text-green-700 border-green-200 pl-2 pr-1"
-              >
-                {item}
-                <button
-                  type="button"
-                  className="ml-1 rounded-full hover:bg-green-200 p-0.5"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeOption(item);
-                  }}
+            selected.map((item) => {
+              // Extract display name if format is "ID:Name", otherwise use item as-is
+              const displayText = item.includes(':') ? item.split(':').slice(1).join(':') : item;
+              return (
+                <Badge
+                  key={item}
+                  variant="outline"
+                  className="bg-green-50 text-green-700 border-green-200 pl-2 pr-1"
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            ))
+                  {displayText}
+                  <button
+                    type="button"
+                    className="ml-1 rounded-full hover:bg-green-200 p-0.5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeOption(item);
+                    }}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              );
+            })
           )}
         </div>
         <ChevronDown
@@ -140,7 +148,9 @@ export function MultiSelect({
                       <Check className="w-3 h-3 text-white" />
                     )}
                   </div>
-                  <span className="text-sm text-green-800">{option}</span>
+                  <span className="text-sm text-green-800">
+                    {option.includes(':') ? option.split(':').slice(1).join(':') : option}
+                  </span>
                 </div>
               ))
             )}

@@ -5,14 +5,6 @@ import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,6 +14,8 @@ import {
 } from "@components/ui/dialog";
 import { Plus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
 import { groupService } from "@api/services/groupService";
+import { Grid, GridItem } from "@components/common/Grid";
+import { DataTable, Column } from "@components/DataTable";
 
 interface Group {
   id: number;
@@ -131,8 +125,16 @@ export function GroupList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const columns: Column<Group>[] = [
+    {
+      header: "Group Name",
+      accessor: "name",
+      cellClassName: "text-green-800",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Groups</h1>
@@ -162,70 +164,31 @@ export function GroupList() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-          <span className="ml-3 text-green-700">Loading groups...</span>
-        </div>
-      ) : isError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p className="font-medium">Error loading groups</p>
-          <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
-        </div>
-      ) : (
-        <div className="border border-green-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                <TableHead className="text-green-800">Group Name</TableHead>
-                <TableHead className="text-green-800 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGroups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="text-center py-8 text-green-600">
-                    No groups found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredGroups.map((group) => (
-                  <TableRow
-                    key={group.id}
-                    className="group hover:bg-green-50/30 transition-colors cursor-pointer [&:hover_.action-buttons]:opacity-100"
-                    onDoubleClick={() => handleEdit(group)}
-                  >
-                    <TableCell className="text-green-800">{group.name}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() => handleEdit(group)}
-                          title="Edit Group"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDelete(group)}
-                          title="Delete Group"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full border border-green-100 rounded flex items-center justify-center">
+            <div className="flex items-center gap-3 text-green-700">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <span>Loading groups...</span>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="h-full border border-red-200 rounded bg-red-50 p-4 text-red-700">
+            <p className="font-medium">Error loading groups</p>
+            <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
+          </div>
+        ) : (
+          <DataTable
+            data={filteredGroups}
+            columns={columns}
+            getRowKey={(group) => group.id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRowDoubleClick={handleEdit}
+            emptyMessage="No groups found"
+          />
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[420px] bg-white border-green-200 shadow-xl rounded-sm">
@@ -237,8 +200,8 @@ export function GroupList() {
               {editingGroup ? "Update the group name" : "Provide the group details"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group Name <span className="text-red-500">*</span>
               </Label>
@@ -248,8 +211,8 @@ export function GroupList() {
                 placeholder="Enter group name"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"

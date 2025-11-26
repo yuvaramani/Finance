@@ -13,14 +13,6 @@ import {
 import { Calendar } from "@components/ui/calendar";
 import { StyledSelect } from "@components/StyledSelect";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -41,6 +33,8 @@ import { accountService } from "@api/services/accountService";
 import { incomeSourceService } from "@api/services/incomeSourceService";
 import { groupService } from "@api/services/groupService";
 import { format } from "date-fns";
+import { Grid, GridItem } from "@components/common/Grid";
+import { DataTable, Column } from "@components/DataTable";
 
 const formatCurrency = (value: number) =>
   `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -318,8 +312,39 @@ export function IncomeList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const columns: Column<any>[] = [
+    {
+      header: "Date",
+      accessor: "date",
+      cellClassName: "text-green-800",
+    },
+    {
+      header: "Account",
+      accessor: (income) => income.account?.name || "—",
+      cellClassName: "text-green-700",
+    },
+    {
+      header: "Source",
+      accessor: (income) => income.source?.name || "—",
+      cellClassName: "text-green-700",
+    },
+    {
+      header: "Amount",
+      accessor: (income) => (
+        <span className="text-green-700 font-semibold">
+          {formatCurrency(income.amount)}
+        </span>
+      ),
+    },
+    {
+      header: "Description",
+      accessor: (income) => income.description || "—",
+      cellClassName: "text-green-700",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Income</h1>
@@ -349,88 +374,31 @@ export function IncomeList() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-          <span className="ml-3 text-green-700">Loading incomes...</span>
-        </div>
-      ) : isError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p className="font-medium">Error loading incomes</p>
-          <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
-        </div>
-      ) : (
-        <div className="border border-green-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                <TableHead className="text-green-800">Date</TableHead>
-                <TableHead className="text-green-800">Account</TableHead>
-                <TableHead className="text-green-800">Source</TableHead>
-                <TableHead className="text-green-800">Amount</TableHead>
-                <TableHead className="text-green-800">Description</TableHead>
-                <TableHead className="text-green-800 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredIncomes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-green-600">
-                    No income records found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredIncomes.map((income: any) => (
-                  <TableRow
-                    key={income.id}
-                    className="group hover:bg-green-50/30 transition-colors cursor-pointer [&:hover_.action-buttons]:opacity-100"
-                    onDoubleClick={() => handleEdit(income)}
-                  >
-                    <TableCell className="text-green-800">
-                      {income.date}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {income.account?.name || "—"}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {income.source?.name || "—"}
-                    </TableCell>
-                    <TableCell className="text-green-700 font-semibold">
-                      {formatCurrency(income.amount)}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {income.description || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() => handleEdit(income)}
-                          title="Edit Income"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDelete(income)}
-                          title="Delete Income"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full border border-green-100 rounded flex items-center justify-center">
+            <div className="flex items-center gap-3 text-green-700">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <span>Loading incomes...</span>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="h-full border border-red-200 rounded bg-red-50 p-4 text-red-700">
+            <p className="font-medium">Error loading incomes</p>
+            <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
+          </div>
+        ) : (
+          <DataTable
+            data={filteredIncomes}
+            columns={columns}
+            getRowKey={(income) => income.id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRowDoubleClick={handleEdit}
+            emptyMessage="No income records found"
+          />
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[620px] bg-white border-green-200 shadow-xl rounded-sm">
@@ -445,8 +413,8 @@ export function IncomeList() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Date <span className="text-red-500">*</span>
               </Label>
@@ -478,9 +446,9 @@ export function IncomeList() {
                   />
                 </PopoverContent>
               </Popover>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Account <span className="text-red-500">*</span>
               </Label>
@@ -512,9 +480,9 @@ export function IncomeList() {
                   )}
                 </Button>
               </div>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Source <span className="text-red-500">*</span>
               </Label>
@@ -546,9 +514,9 @@ export function IncomeList() {
                   )}
                 </Button>
               </div>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Amount <span className="text-red-500">*</span>
               </Label>
@@ -561,9 +529,9 @@ export function IncomeList() {
                 placeholder="Enter amount"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800">Description</Label>
               <Textarea
                 value={formData.description}
@@ -571,8 +539,8 @@ export function IncomeList() {
                 placeholder="Add any notes"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 min-h-[100px]"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
 
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
@@ -617,8 +585,8 @@ export function IncomeList() {
               Create a new account to use for income entries
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group <span className="text-red-500">*</span>
               </Label>
@@ -632,8 +600,8 @@ export function IncomeList() {
                   label: group.name,
                 }))}
               />
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Account Name <span className="text-red-500">*</span>
               </Label>
@@ -643,8 +611,8 @@ export function IncomeList() {
                 placeholder="For ex: HDFC Bank"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label className="text-green-800">Opening Balance</Label>
               <Input
                 type="number"
@@ -655,8 +623,8 @@ export function IncomeList() {
                 placeholder="0.00"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
@@ -703,8 +671,8 @@ export function IncomeList() {
               Create a new income source on the fly
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Source Name <span className="text-red-500">*</span>
               </Label>
@@ -714,8 +682,8 @@ export function IncomeList() {
                 placeholder="Consulting, Rent, etc."
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"

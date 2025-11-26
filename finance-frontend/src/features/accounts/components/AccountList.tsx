@@ -3,14 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 import { Button } from "@components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,6 +21,8 @@ import {
 import { accountService } from "@api/services/accountService";
 import { groupService } from "@api/services/groupService";
 import { StyledSelect } from "@components/StyledSelect";
+import { Grid, GridItem } from "@components/common/Grid";
+import { DataTable, Column } from "@components/DataTable";
 
 const statusOptions = [
   { label: "Active", value: "Active" },
@@ -215,8 +209,34 @@ export function AccountList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const columns: Column<any>[] = [
+    {
+      header: "Account Name",
+      accessor: "name",
+      cellClassName: "text-green-800",
+    },
+    {
+      header: "Group",
+      accessor: (account) => account.group_name || "—",
+      cellClassName: "text-green-700",
+    },
+    {
+      header: "Balance",
+      accessor: (account) => (
+        <span className="text-green-700 font-semibold">
+          ₹{Number(account.balance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+        </span>
+      ),
+    },
+    {
+      header: "Status",
+      accessor: (account) => account.status,
+      cellClassName: "text-green-700",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Accounts</h1>
@@ -245,82 +265,31 @@ export function AccountList() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-          <span className="ml-3 text-green-700">Loading accounts...</span>
-        </div>
-      ) : isError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p className="font-medium">Error loading accounts</p>
-          <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
-        </div>
-      ) : (
-        <div className="border border-green-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                <TableHead className="text-green-800">Account Name</TableHead>
-                <TableHead className="text-green-800">Group</TableHead>
-                <TableHead className="text-green-800">Balance</TableHead>
-                <TableHead className="text-green-800">Status</TableHead>
-                <TableHead className="text-green-800 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {accounts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-green-600">
-                    No accounts found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                accounts.map((account: any) => (
-                  <TableRow
-                    key={account.id}
-                    className="group hover:bg-green-50/30 transition-colors cursor-pointer [&:hover_.action-buttons]:opacity-100"
-                    onDoubleClick={() => handleEdit(account)}
-                  >
-                    <TableCell className="text-green-800">{account.name}</TableCell>
-                    <TableCell className="text-green-700">
-                      {account.group_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-green-700 font-semibold">
-                      ₹{Number(account.balance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {account.status}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() => handleEdit(account)}
-                          title="Edit Account"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDelete(account)}
-                          title="Delete Account"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full border border-green-100 rounded flex items-center justify-center">
+            <div className="flex items-center gap-3 text-green-700">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <span>Loading accounts...</span>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="h-full border border-red-200 rounded bg-red-50 p-4 text-red-700">
+            <p className="font-medium">Error loading accounts</p>
+            <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
+          </div>
+        ) : (
+          <DataTable
+            data={accounts}
+            columns={columns}
+            getRowKey={(account) => account.id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRowDoubleClick={handleEdit}
+            emptyMessage="No accounts found"
+          />
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[520px] bg-white border-green-200 shadow-xl rounded-sm">
@@ -332,8 +301,8 @@ export function AccountList() {
               Provide the account information below
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group <span className="text-red-500">*</span>
               </Label>
@@ -365,9 +334,9 @@ export function AccountList() {
                   )}
                 </Button>
               </div>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Name <span className="text-red-500">*</span>
               </Label>
@@ -377,9 +346,9 @@ export function AccountList() {
                 placeholder="For ex: My Wallet, Bank Account"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800">Status</Label>
               <StyledSelect
                 value={formData.status}
@@ -393,9 +362,9 @@ export function AccountList() {
                 <p><strong>Active</strong>: You can add transactions like Income, Expense, and Transfers to this account.</p>
                 <p><strong>Archive</strong>: Archived accounts cannot be edited or used for new transactions.</p>
               </div>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800">Balance</Label>
               <Input
                 type="number"
@@ -403,8 +372,8 @@ export function AccountList() {
                 onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
@@ -446,8 +415,8 @@ export function AccountList() {
               Enter the name of the new group
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group Name <span className="text-red-500">*</span>
               </Label>
@@ -458,8 +427,8 @@ export function AccountList() {
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
                 disabled={addGroupMutation.isPending}
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"

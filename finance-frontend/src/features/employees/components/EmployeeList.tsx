@@ -3,14 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 import { Button } from "@components/ui/button";
 import { Badge } from "@components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@components/ui/table";
+import { DataTable, Column } from "@components/DataTable";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +16,7 @@ import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Plus, Pencil, Archive, Search, Loader2 } from "lucide-react";
 import { MultiSelect } from "@components/MultiSelect";
+import { Grid, GridItem } from "@components/common/Grid";
 import { employeeService } from "@api/services/employeeService";
 import { projectService } from "@api/services/projectService";
 import axiosInstance from "@api/axios";
@@ -56,6 +50,32 @@ export function EmployeeList() {
     projects: [] as string[],
   });
 
+  // Fetch projects for dropdown (needed before normalizing employees)
+  const {
+    data: projectsData,
+    isLoading: isProjectsLoading,
+    isError: isProjectsError,
+  } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => projectService.getProjects({ status: "active", per_page: 1000 }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const projectsList =
+    projectsData?.data?.projects ||
+    projectsData?.projects ||
+    projectsData?.data ||
+    projectsData ||
+    [];
+
+  // Create a map of project ID to name for display
+  const projectMap = new Map<number, string>();
+  projectsList.forEach((project: any) => {
+    if (project.id && project.name) {
+      projectMap.set(project.id, project.name);
+    }
+  });
+
   // Fetch employees
   const {
     data: employeesData,
@@ -68,30 +88,78 @@ export function EmployeeList() {
     retry: 1,
   });
 
-  const normalizeEmployees = (items: any[]): Employee[] =>
+  const normalizeEmployees = (items: any[], projectMap: Map<number, string>): Employee[] =>
     (items || []).map((item) => {
       const rawProjects = item.projects ?? item.project_ids ?? [];
-      let projectsArray: string[] = [];
+      let projectIds: string[] = [];
 
       if (Array.isArray(rawProjects)) {
-        projectsArray = rawProjects;
+        // If array, convert to string IDs
+        projectIds = rawProjects.map((p: any) => {
+          if (typeof p === 'number') return p.toString();
+          if (typeof p === 'string') {
+            // Check if it's already an ID (numeric string) or a name
+            const num = parseInt(p, 10);
+            if (!isNaN(num)) return p;
+            // If it's a name, try to find the ID from projectMap
+            for (const [id, name] of projectMap.entries()) {
+              if (name === p) return id.toString();
+            }
+            return p; // Fallback to original value
+          }
+          return String(p);
+        });
       } else if (typeof rawProjects === "string" && rawProjects.length > 0) {
         try {
           const parsed = JSON.parse(rawProjects);
-          projectsArray = Array.isArray(parsed) ? parsed : rawProjects.split(",").map((p) => p.trim());
+          if (Array.isArray(parsed)) {
+            projectIds = parsed.map((p: any) => {
+              if (typeof p === 'number') return p.toString();
+              if (typeof p === 'string') {
+                const num = parseInt(p, 10);
+                if (!isNaN(num)) return p;
+                // Try to find ID from name
+                for (const [id, name] of projectMap.entries()) {
+                  if (name === p) return id.toString();
+                }
+                return p;
+              }
+              return String(p);
+            });
+          } else {
+            projectIds = rawProjects.split(",").map((p: string) => {
+              const trimmed = p.trim();
+              const num = parseInt(trimmed, 10);
+              if (!isNaN(num)) return trimmed;
+              // Try to find ID from name
+              for (const [id, name] of projectMap.entries()) {
+                if (name === trimmed) return id.toString();
+              }
+              return trimmed;
+            });
+          }
         } catch {
-          projectsArray = rawProjects.split(",").map((p) => p.trim());
+          projectIds = rawProjects.split(",").map((p: string) => {
+            const trimmed = p.trim();
+            const num = parseInt(trimmed, 10);
+            if (!isNaN(num)) return trimmed;
+            // Try to find ID from name
+            for (const [id, name] of projectMap.entries()) {
+              if (name === trimmed) return id.toString();
+            }
+            return trimmed;
+          });
         }
       }
 
       return {
         id: item.id,
         name: item.name || "",
-        accName: item.acc_name || item.accName || "",
-        accNumber: item.acc_number || item.accNumber || item.bank_account || "",
+        accName: item.account_name || item.acc_name || item.accName || "",
+        accNumber: item.account_number || item.acc_number || item.accNumber || item.bank_account || "",
         ifscCode: item.ifsc_code || item.ifscCode || "",
         panNo: item.pan_no || item.panNo || item.pan_card || "",
-        projects: projectsArray,
+        projects: projectIds, // Store as IDs (string array)
         status: item.status || "active",
       };
     });
@@ -103,39 +171,27 @@ export function EmployeeList() {
     employeesData ||
     [];
 
-  const employees: Employee[] = normalizeEmployees(rawEmployees);
+  const employees: Employee[] = normalizeEmployees(rawEmployees, projectMap);
 
-  // Fetch projects for dropdown
-  const {
-    data: projectsData,
-    isLoading: isProjectsLoading,
-    isError: isProjectsError,
-  } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => projectService.getProjects({ status: "active", per_page: 1000 }),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const availableProjects: string[] =
-    projectsData?.data?.projects?.map((project: any) => project.name) ??
-    projectsData?.projects?.map((project: any) => project.name) ??
-    [];
+  // Available project options for MultiSelect (as IDs converted to strings)
+  const availableProjects: string[] = projectsList
+    .map((project: any) => project.id?.toString())
+    .filter((id: string | undefined) => id !== undefined);
 
   // Add project mutation
   const addProjectMutation = useMutation({
     mutationFn: (payload: { name: string }) =>
       axiosInstance.post(ENDPOINTS.PROJECTS.CREATE, payload),
     onSuccess: (data) => {
-      const addedProjectName =
-        data?.data?.project?.name ||
-        data?.project?.name ||
-        data?.name ||
-        newProjectName.trim();
+      const addedProjectId =
+        data?.data?.project?.id ||
+        data?.project?.id ||
+        data?.id;
 
-      if (addedProjectName) {
+      if (addedProjectId) {
         setFormData((prev) => ({
           ...prev,
-          projects: Array.from(new Set([...prev.projects, addedProjectName])),
+          projects: Array.from(new Set([...prev.projects, addedProjectId.toString()])),
         }));
       }
 
@@ -239,8 +295,8 @@ export function EmployeeList() {
 
   const buildPayload = () => ({
     name: formData.name,
-    acc_name: formData.accName,
-    acc_number: formData.accNumber,
+    account_name: formData.accName,
+    account_number: formData.accNumber,
     ifsc_code: formData.ifscCode,
     pan_no: formData.panNo,
     projects: formData.projects,
@@ -276,8 +332,55 @@ export function EmployeeList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const columns: Column<Employee>[] = [
+    {
+      header: "Employee Name",
+      accessor: "name",
+      cellClassName: "text-green-800",
+    },
+    {
+      header: "Account Name",
+      accessor: "accName",
+      cellClassName: "text-green-700",
+    },
+    {
+      header: "Account Number",
+      accessor: "accNumber",
+      cellClassName: "text-green-700 font-mono text-sm",
+    },
+    {
+      header: "IFSC Code",
+      accessor: "ifscCode",
+      cellClassName: "text-green-700 font-mono text-sm",
+    },
+    {
+      header: "PAN No.",
+      accessor: "panNo",
+      cellClassName: "text-green-700 font-mono text-sm",
+    },
+    {
+      header: "Projects",
+      accessor: (employee) => (
+        <div className="flex flex-wrap gap-1">
+          {(employee.projects || []).map((projectId, idx) => {
+            const projectName = projectMap.get(parseInt(projectId, 10)) || projectId;
+            return (
+              <Badge
+                key={idx}
+                variant="outline"
+                className="bg-green-50 text-green-700 border-green-200 text-xs"
+              >
+                {projectName}
+              </Badge>
+            );
+          })}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full gap-6 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -309,113 +412,45 @@ export function EmployeeList() {
         </Button>
       </div>
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-          <span className="ml-3 text-green-700">Loading employees...</span>
-        </div>
-      )}
-
-      {/* Error State */}
-      {isError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p className="font-medium">Error loading employees</p>
-          <p className="text-sm mt-1">
-            {(error as any)?.message || "Failed to fetch employees. Please try again."}
-          </p>
-        </div>
-      )}
-
-      {/* Employee Table */}
-      {!isLoading && !isError && (
-        <div>
-          <div className="border border-green-100 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                  <TableHead className="text-green-800">Employee Name</TableHead>
-                  <TableHead className="text-green-800">Account Name</TableHead>
-                  <TableHead className="text-green-800">Account Number</TableHead>
-                  <TableHead className="text-green-800">IFSC Code</TableHead>
-                  <TableHead className="text-green-800">PAN No.</TableHead>
-                  <TableHead className="text-green-800">Projects</TableHead>
-                  <TableHead className="text-green-800 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmployees.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-green-600">
-                      {searchQuery ? "No employees found matching your search" : "No employees found"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredEmployees.map((employee) => (
-                  <TableRow
-                    key={employee.id}
-                    className="hover:bg-green-50/30 transition-colors cursor-pointer [&:hover_.action-buttons]:opacity-100"
-                    onDoubleClick={() => handleEdit(employee)}
-                  >
-                      <TableCell className="text-green-800">
-                        {employee.name}
-                      </TableCell>
-                      <TableCell className="text-green-700">
-                        {employee.accName}
-                      </TableCell>
-                      <TableCell className="text-green-700 font-mono text-sm">
-                        {employee.accNumber}
-                      </TableCell>
-                      <TableCell className="text-green-700 font-mono text-sm">
-                        {employee.ifscCode}
-                      </TableCell>
-                      <TableCell className="text-green-700 font-mono text-sm">
-                        {employee.panNo}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {(employee.projects || []).map((project, idx) => (
-                            <Badge
-                              key={idx}
-                              variant="outline"
-                              className="bg-green-50 text-green-700 border-green-200 text-xs"
-                            >
-                              {project}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                            onClick={() => handleEdit(employee)}
-                            title="Edit Employee"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
-                            onClick={() => handleArchive(employee.id)}
-                            title="Archive Employee"
-                            disabled={archiveMutation.isPending}
-                          >
-                            <Archive className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+      {/* Table Container */}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full border border-green-100 rounded flex items-center justify-center">
+            <div className="flex items-center gap-3 text-green-700">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <span>Loading employees...</span>
+            </div>
           </div>
-        </div>
-      )}
+        ) : isError ? (
+          <div className="h-full border border-red-200 rounded bg-red-50 p-4 text-red-700">
+            <p className="font-medium">Error loading employees</p>
+            <p className="text-sm mt-1">
+              {(error as any)?.message || "Failed to fetch employees. Please try again."}
+            </p>
+          </div>
+        ) : (
+          <DataTable
+            data={filteredEmployees}
+            columns={columns}
+            getRowKey={(employee) => employee.id}
+            onEdit={handleEdit}
+            onRowDoubleClick={handleEdit}
+            renderActions={(employee) => (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                onClick={() => handleArchive(employee.id)}
+                title="Archive Employee"
+                disabled={archiveMutation.isPending}
+              >
+                <Archive className="w-4 h-4" />
+              </Button>
+            )}
+            emptyMessage={searchQuery ? "No employees found matching your search" : "No employees found"}
+          />
+        )}
+      </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -430,8 +465,8 @@ export function EmployeeList() {
                 : "Fill in the details to add a new employee"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label htmlFor="name" className="text-green-800 flex items-center gap-1.5">
                 Employee Name <span className="text-red-500">*</span>
               </Label>
@@ -444,8 +479,8 @@ export function EmployeeList() {
                 placeholder="Enter full name"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label htmlFor="accName" className="text-green-800 flex items-center gap-1.5">
                 Account Name <span className="text-red-500">*</span>
               </Label>
@@ -458,38 +493,40 @@ export function EmployeeList() {
                 placeholder="Enter account holder name"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2.5">
-                <Label htmlFor="accNumber" className="text-green-800 flex items-center gap-1.5">
-                  Account Number <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="accNumber"
-                  value={formData.accNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, accNumber: e.target.value })
-                  }
-                  placeholder="Enter account number"
-                  className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
-                />
+            </GridItem>
+            <GridItem>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="accNumber" className="text-green-800 flex items-center gap-1.5">
+                    Account Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="accNumber"
+                    value={formData.accNumber}
+                    onChange={(e) =>
+                      setFormData({ ...formData, accNumber: e.target.value })
+                    }
+                    placeholder="Enter account number"
+                    className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ifscCode" className="text-green-800 flex items-center gap-1.5">
+                    IFSC Code <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="ifscCode"
+                    value={formData.ifscCode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })
+                    }
+                    placeholder="Enter IFSC code"
+                    className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2.5">
-                <Label htmlFor="ifscCode" className="text-green-800 flex items-center gap-1.5">
-                  IFSC Code <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="ifscCode"
-                  value={formData.ifscCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })
-                  }
-                  placeholder="Enter IFSC code"
-                  className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
-                />
-              </div>
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label htmlFor="panNo" className="text-green-800 flex items-center gap-1.5">
                 PAN Number <span className="text-red-500">*</span>
               </Label>
@@ -503,19 +540,30 @@ export function EmployeeList() {
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
                 maxLength={10}
               />
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label htmlFor="projects" className="text-green-800">
                 Projects
               </Label>
               <div className="flex items-center gap-2">
                 <div className="flex-1">
                   <MultiSelect
-                    options={availableProjects}
-                    selected={formData.projects}
-                    onChange={(selected) =>
-                      setFormData({ ...formData, projects: selected })
-                    }
+                    options={availableProjects.map((id) => {
+                      const name = projectMap.get(parseInt(id, 10)) || id;
+                      return `${id}:${name}`; // Format: "ID:Name" for display
+                    })}
+                    selected={formData.projects.map((id) => {
+                      const name = projectMap.get(parseInt(id, 10)) || id;
+                      return `${id}:${name}`;
+                    })}
+                    onChange={(selected) => {
+                      // Extract IDs from "ID:Name" format
+                      const projectIds = selected.map((item) => {
+                        const parts = item.split(':');
+                        return parts[0]; // Return the ID part
+                      });
+                      setFormData({ ...formData, projects: projectIds });
+                    }}
                     placeholder={
                       isProjectsLoading
                         ? "Loading projects..."
@@ -542,8 +590,8 @@ export function EmployeeList() {
                   )}
                 </Button>
               </div>
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
@@ -589,8 +637,8 @@ export function EmployeeList() {
               Enter the project name. This will be available in the project list immediately.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label htmlFor="newProjectName" className="text-green-800 flex items-center gap-1.5">
                 Project Name <span className="text-red-500">*</span>
               </Label>
@@ -602,8 +650,8 @@ export function EmployeeList() {
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
                 disabled={addProjectMutation.isPending}
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"

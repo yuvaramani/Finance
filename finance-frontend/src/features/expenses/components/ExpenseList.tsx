@@ -6,14 +6,6 @@ import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Textarea } from "@components/ui/textarea";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -41,6 +33,8 @@ import { expenseService } from "@api/services/expenseService";
 import { accountService } from "@api/services/accountService";
 import { groupService } from "@api/services/groupService";
 import { expenseCategoryService } from "@api/services/expenseCategoryService";
+import { Grid, GridItem } from "@components/common/Grid";
+import { DataTable, Column } from "@components/DataTable";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -312,8 +306,39 @@ export function ExpenseList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const columns: Column<any>[] = [
+    {
+      header: "Date",
+      accessor: "date",
+      cellClassName: "text-green-800",
+    },
+    {
+      header: "Account",
+      accessor: (expense) => expense.account?.name || "—",
+      cellClassName: "text-green-700",
+    },
+    {
+      header: "Category",
+      accessor: (expense) => expense.category?.name || "—",
+      cellClassName: "text-green-700",
+    },
+    {
+      header: "Amount",
+      accessor: (expense) => (
+        <span className="text-green-700 font-semibold">
+          {formatCurrency(expense.amount)}
+        </span>
+      ),
+    },
+    {
+      header: "Description",
+      accessor: (expense) => expense.description || "—",
+      cellClassName: "text-green-700",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Expenses</h1>
@@ -343,86 +368,31 @@ export function ExpenseList() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-          <span className="ml-3 text-green-700">Loading expenses...</span>
-        </div>
-      ) : isError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p className="font-medium">Error loading expenses</p>
-          <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
-        </div>
-      ) : (
-        <div className="border border-green-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                <TableHead className="text-green-800">Date</TableHead>
-                <TableHead className="text-green-800">Account</TableHead>
-                <TableHead className="text-green-800">Category</TableHead>
-                <TableHead className="text-green-800">Amount</TableHead>
-                <TableHead className="text-green-800">Description</TableHead>
-                <TableHead className="text-green-800 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredExpenses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-green-600">
-                    No expenses found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredExpenses.map((expense: any) => (
-                  <TableRow
-                    key={expense.id}
-                    className="group hover:bg-green-50/30 transition-colors cursor-pointer [&:hover_.action-buttons]:opacity-100"
-                    onDoubleClick={() => handleEdit(expense)}
-                  >
-                    <TableCell className="text-green-800">{expense.date}</TableCell>
-                    <TableCell className="text-green-700">
-                      {expense.account?.name || "—"}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {expense.category?.name || "—"}
-                    </TableCell>
-                    <TableCell className="text-green-700 font-semibold">
-                      {formatCurrency(expense.amount)}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {expense.description || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() => handleEdit(expense)}
-                          title="Edit Expense"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDelete(expense)}
-                          title="Delete Expense"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full border border-green-100 rounded flex items-center justify-center">
+            <div className="flex items-center gap-3 text-green-700">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <span>Loading expenses...</span>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="h-full border border-red-200 rounded bg-red-50 p-4 text-red-700">
+            <p className="font-medium">Error loading expenses</p>
+            <p className="text-sm mt-1">{(error as any)?.message || "Please try again."}</p>
+          </div>
+        ) : (
+          <DataTable
+            data={filteredExpenses}
+            columns={columns}
+            getRowKey={(expense) => expense.id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onRowDoubleClick={handleEdit}
+            emptyMessage="No expenses found"
+          />
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[620px] bg-white border-green-200 shadow-xl rounded-sm">
@@ -437,8 +407,8 @@ export function ExpenseList() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Date <span className="text-red-500">*</span>
               </Label>
@@ -470,9 +440,9 @@ export function ExpenseList() {
                   />
                 </PopoverContent>
               </Popover>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Account <span className="text-red-500">*</span>
               </Label>
@@ -504,9 +474,9 @@ export function ExpenseList() {
                   )}
                 </Button>
               </div>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Category <span className="text-red-500">*</span>
               </Label>
@@ -538,9 +508,9 @@ export function ExpenseList() {
                   )}
                 </Button>
               </div>
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Amount <span className="text-red-500">*</span>
               </Label>
@@ -553,9 +523,9 @@ export function ExpenseList() {
                 placeholder="Enter amount"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
+            </GridItem>
 
-            <div className="grid gap-2.5">
+            <GridItem>
               <Label className="text-green-800">Description</Label>
               <Textarea
                 value={formData.description}
@@ -563,8 +533,8 @@ export function ExpenseList() {
                 placeholder="Add any notes"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 min-h-[100px]"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
 
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
@@ -609,8 +579,8 @@ export function ExpenseList() {
               Create a new account to use for expenses
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group <span className="text-red-500">*</span>
               </Label>
@@ -624,8 +594,8 @@ export function ExpenseList() {
                   label: group.name,
                 }))}
               />
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Account Name <span className="text-red-500">*</span>
               </Label>
@@ -635,8 +605,8 @@ export function ExpenseList() {
                 placeholder="For ex: HDFC Bank"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-            <div className="grid gap-2.5">
+            </GridItem>
+            <GridItem>
               <Label className="text-green-800">Opening Balance</Label>
               <Input
                 type="number"
@@ -647,8 +617,8 @@ export function ExpenseList() {
                 placeholder="0.00"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
@@ -695,8 +665,8 @@ export function ExpenseList() {
               Create a new expense category
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 py-6">
-            <div className="grid gap-2.5">
+          <Grid>
+            <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Category Name <span className="text-red-500">*</span>
               </Label>
@@ -706,8 +676,8 @@ export function ExpenseList() {
                 placeholder="Rent, Software, Utilities..."
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
-            </div>
-          </div>
+            </GridItem>
+          </Grid>
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
