@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(do sed -i 's/lucide-react@[0-9.]*\"\"/lucide-react\"\"/g' \"$file\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(php artisan serve:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 10 curl:*)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"UPDATE users SET first_name = ''yuvaraj'', last_name = '''' WHERE email = ''yuvaraj@example.com'';\")",
+      "Bash(net start MySQL)",
+      "Bash(php update_user.php:*)",
+      "Bash(php artisan tinker:*)",
+      "Bash(findstr:*)",
+      "Bash(php artisan:*)",
+      "Bash(del databasemigrations2025_11_24_132518_create_employee_project_table.php)",
+      "Bash(dir /B /O-D)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"SHOW TABLES;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE groups;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE accounts;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DROP TABLE IF EXISTS accounts;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\":*)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS accounts; SET FOREIGN_KEY_CHECKS=1;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE income_sources;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE incomes;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE expense_categories;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE expenses;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE salaries;\")",
+      "Bash(dir \"C:\\xampp\\htdocs\\Finance\\Figma\" /B)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DROP TABLE IF EXISTS employees;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS salaries; DROP TABLE IF EXISTS employees; SET FOREIGN_KEY_CHECKS=1;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE employees;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"DESCRIBE projects;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root finance_db -e \"SHOW TABLES LIKE ''employee_project'';\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
