@@ -7,6 +7,11 @@ export const incomeService = {
     return response.data || response;
   },
 
+  async getIncome(id) {
+    const response = await axiosInstance.get(ENDPOINTS.INCOMES.DETAIL(id));
+    return response.data || response;
+  },
+
   async createIncome(data) {
     const response = await axiosInstance.post(ENDPOINTS.INCOMES.CREATE, data);
     return response.data || response;

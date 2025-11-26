@@ -7,6 +7,11 @@ export const accountService = {
     return response.data || response;
   },
 
+  async getAccount(id) {
+    const response = await axiosInstance.get(ENDPOINTS.ACCOUNTS.DETAIL(id));
+    return response.data || response;
+  },
+
   async createAccount(data) {
     const response = await axiosInstance.post(ENDPOINTS.ACCOUNTS.CREATE, data);
     return response.data || response;

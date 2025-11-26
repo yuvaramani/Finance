@@ -7,6 +7,11 @@ export const expenseService = {
     return response.data || response;
   },
 
+  async getExpense(id) {
+    const response = await axiosInstance.get(ENDPOINTS.EXPENSES.DETAIL(id));
+    return response.data || response;
+  },
+
   async createExpense(data) {
     const response = await axiosInstance.post(ENDPOINTS.EXPENSES.CREATE, data);
     return response.data || response;

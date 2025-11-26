@@ -7,6 +7,11 @@ export const projectService = {
     return response.data || response;
   },
 
+  async getProject(id) {
+    const response = await axiosInstance.get(ENDPOINTS.PROJECTS.DETAIL(id));
+    return response.data || response;
+  },
+
   async createProject(data) {
     const response = await axiosInstance.post(ENDPOINTS.PROJECTS.CREATE, data);
     return response.data || response;

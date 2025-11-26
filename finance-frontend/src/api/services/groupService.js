@@ -7,6 +7,11 @@ export const groupService = {
     return response.data || response;
   },
 
+  async getGroup(id) {
+    const response = await axiosInstance.get(ENDPOINTS.GROUPS.DETAIL(id));
+    return response.data || response;
+  },
+
   async createGroup(data) {
     const response = await axiosInstance.post(ENDPOINTS.GROUPS.CREATE, data);
     return response.data || response;
