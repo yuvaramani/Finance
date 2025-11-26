@@ -13,16 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@components/ui/dialog";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@components/ui/popover";
-import { Calendar } from "@components/ui/calendar";
 import { StyledSelect } from "@components/StyledSelect";
-import { format } from "date-fns";
+import { DatePicker } from "@components/common/DatePicker";
 import {
-  Calendar as CalendarIcon,
   Loader2,
   Pencil,
   Plus,
@@ -51,6 +44,7 @@ export function ExpenseList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
+  const [isLoadingExpense, setIsLoadingExpense] = useState(false);
   const [formData, setFormData] = useState({
     date: today(),
     account_id: "",
@@ -258,16 +252,29 @@ export function ExpenseList() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (expense: any) => {
-    setEditingExpense(expense);
-    setFormData({
-      date: expense.date,
-      account_id: expense.account?.id?.toString() || "",
-      category_id: expense.category?.id?.toString() || "",
-      amount: expense.amount?.toString() || "",
-      description: expense.description || "",
-    });
+  const handleEdit = async (expense: any) => {
+    setIsLoadingExpense(true);
     setIsDialogOpen(true);
+    
+    try {
+      // Fetch fresh expense data from the API
+      const response = await expenseService.getExpense(expense.id);
+      const freshExpenseData = response?.data?.expense || response?.expense || response;
+      
+      setEditingExpense(freshExpenseData);
+      setFormData({
+        date: freshExpenseData.date || today(),
+        account_id: freshExpenseData.account?.id?.toString() || "",
+        category_id: freshExpenseData.category?.id?.toString() || "",
+        amount: freshExpenseData.amount?.toString() || "",
+        description: freshExpenseData.description || "",
+      });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || "Failed to load expense data", { variant: "error" });
+      setIsDialogOpen(false);
+    } finally {
+      setIsLoadingExpense(false);
+    }
   };
 
   const handleDelete = (expense: any) => {
@@ -409,37 +416,13 @@ export function ExpenseList() {
 
           <Grid>
             <GridItem>
-              <Label className="text-green-800 flex items-center gap-1.5">
-                Date <span className="text-red-500">*</span>
-              </Label>
-              <Popover modal={false}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`w-full justify-between text-left font-normal h-11 border-green-200 hover:bg-green-50 ${
-                      !formData.date ? "text-green-400" : "text-green-800"
-                    }`}
-                  >
-                    {formData.date
-                      ? format(new Date(formData.date), "dd-MMM-yyyy")
-                      : "Select date"}
-                    <CalendarIcon className="w-4 h-4 text-emerald-600" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-white border-green-100" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.date ? new Date(formData.date) : undefined}
-                    onSelect={(date) =>
-                      setFormData({
-                        ...formData,
-                        date: date ? date.toISOString().slice(0, 10) : "",
-                      })
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <DatePicker
+                label="Date"
+                value={formData.date}
+                onChange={(date) => setFormData({ ...formData, date: date || today() })}
+                placeholder="Select date"
+                required
+              />
             </GridItem>
 
             <GridItem>

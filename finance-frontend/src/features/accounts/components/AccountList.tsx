@@ -42,6 +42,7 @@ export function AccountList() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     group_id: "",
@@ -164,15 +165,28 @@ export function AccountList() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (account: any) => {
-    setEditingAccount(account);
-    setFormData({
-      group_id: account.group_id?.toString() ?? "",
-      name: account.name ?? "",
-      status: account.status ?? "Active",
-      balance: account.balance?.toString() ?? "0",
-    });
+  const handleEdit = async (account: any) => {
+    setIsLoadingAccount(true);
     setIsDialogOpen(true);
+    
+    try {
+      // Fetch fresh account data from the API
+      const response = await accountService.getAccount(account.id);
+      const freshAccountData = response?.data?.account || response?.account || response;
+      
+      setEditingAccount(freshAccountData);
+      setFormData({
+        group_id: freshAccountData.group_id?.toString() ?? "",
+        name: freshAccountData.name ?? "",
+        status: freshAccountData.status ?? "Active",
+        balance: freshAccountData.balance?.toString() ?? "0",
+      });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || "Failed to load account data", { variant: "error" });
+      setIsDialogOpen(false);
+    } finally {
+      setIsLoadingAccount(false);
+    }
   };
 
   const handleDelete = (account: any) => {
@@ -301,7 +315,15 @@ export function AccountList() {
               Provide the account information below
             </DialogDescription>
           </DialogHeader>
-          <Grid>
+          {isLoadingAccount ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-3 text-green-700">
+                <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+                <span>Loading account data...</span>
+              </div>
+            </div>
+          ) : (
+            <Grid>
             <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group <span className="text-red-500">*</span>
@@ -311,7 +333,7 @@ export function AccountList() {
                   value={formData.group_id}
                   onChange={(value) => setFormData({ ...formData, group_id: value })}
                   placeholder="- Select -"
-                  disabled={isGroupsLoading || isGroupsError}
+                  disabled={isGroupsLoading || isGroupsError || isLoadingAccount}
                   options={groups.map((group: any) => ({
                     value: group.id?.toString(),
                     label: group.name,
@@ -324,7 +346,7 @@ export function AccountList() {
                   variant="outline"
                   className="h-11 w-11 border-green-200 text-green-700 hover:bg-green-50 flex-shrink-0"
                   onClick={() => setIsAddGroupDialogOpen(true)}
-                  disabled={addGroupMutation.isPending}
+                  disabled={addGroupMutation.isPending || isLoadingAccount}
                   title="Add Group"
                 >
                   {addGroupMutation.isPending ? (
@@ -340,11 +362,12 @@ export function AccountList() {
               <Label className="text-green-800 flex items-center gap-1.5">
                 Name <span className="text-red-500">*</span>
               </Label>
-              <Input
+                <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="For ex: My Wallet, Bank Account"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
+                disabled={isLoadingAccount}
               />
             </GridItem>
 
@@ -357,6 +380,7 @@ export function AccountList() {
                   value: option.value,
                   label: option.label,
                 }))}
+                disabled={isLoadingAccount}
               />
               <div className="text-sm text-green-700 space-y-1">
                 <p><strong>Active</strong>: You can add transactions like Income, Expense, and Transfers to this account.</p>
@@ -371,15 +395,20 @@ export function AccountList() {
                 value={formData.balance}
                 onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
+                disabled={isLoadingAccount}
               />
             </GridItem>
           </Grid>
+          )}
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
-              onClick={resetDialog}
+              onClick={() => {
+                resetDialog();
+                setIsLoadingAccount(false);
+              }}
               className="border-green-200 text-green-700 hover:bg-green-50 h-11 px-6"
-              disabled={isSaving}
+              disabled={isSaving || isLoadingAccount}
             >
               Reset
             </Button>
@@ -388,6 +417,7 @@ export function AccountList() {
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md h-11 px-6"
               disabled={
                 isSaving ||
+                isLoadingAccount ||
                 !formData.group_id ||
                 !formData.name.trim()
               }

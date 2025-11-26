@@ -28,6 +28,7 @@ export function GroupList() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [isLoadingGroup, setIsLoadingGroup] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({ name: "" });
 
@@ -97,10 +98,23 @@ export function GroupList() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (group: Group) => {
-    setEditingGroup(group);
-    setFormData({ name: group.name });
+  const handleEdit = async (group: Group) => {
+    setIsLoadingGroup(true);
     setIsDialogOpen(true);
+    
+    try {
+      // Fetch fresh group data from the API
+      const response = await groupService.getGroup(group.id);
+      const freshGroupData = response?.data?.group || response?.group || response;
+      
+      setEditingGroup(freshGroupData);
+      setFormData({ name: freshGroupData.name || "" });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || "Failed to load group data", { variant: "error" });
+      setIsDialogOpen(false);
+    } finally {
+      setIsLoadingGroup(false);
+    }
   };
 
   const handleDelete = (group: Group) => {

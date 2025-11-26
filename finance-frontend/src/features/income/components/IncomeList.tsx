@@ -5,13 +5,8 @@ import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Textarea } from "@components/ui/textarea";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@components/ui/popover";
-import { Calendar } from "@components/ui/calendar";
 import { StyledSelect } from "@components/StyledSelect";
+import { DatePicker } from "@components/common/DatePicker";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +16,6 @@ import {
   DialogTitle,
 } from "@components/ui/dialog";
 import {
-  Calendar as CalendarIcon,
   Loader2,
   Pencil,
   Plus,
@@ -32,7 +26,6 @@ import { incomeService } from "@api/services/incomeService";
 import { accountService } from "@api/services/accountService";
 import { incomeSourceService } from "@api/services/incomeSourceService";
 import { groupService } from "@api/services/groupService";
-import { format } from "date-fns";
 import { Grid, GridItem } from "@components/common/Grid";
 import { DataTable, Column } from "@components/DataTable";
 
@@ -51,6 +44,7 @@ export function IncomeList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIncome, setEditingIncome] = useState<any>(null);
+  const [isLoadingIncome, setIsLoadingIncome] = useState(false);
   const [formData, setFormData] = useState({
     date: today(),
     account_id: "",
@@ -264,16 +258,29 @@ export function IncomeList() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (income: any) => {
-    setEditingIncome(income);
-    setFormData({
-      date: income.date,
-      account_id: income.account?.id?.toString() || "",
-      source_id: income.source?.id?.toString() || "",
-      amount: income.amount?.toString() || "",
-      description: income.description || "",
-    });
+  const handleEdit = async (income: any) => {
+    setIsLoadingIncome(true);
     setIsDialogOpen(true);
+    
+    try {
+      // Fetch fresh income data from the API
+      const response = await incomeService.getIncome(income.id);
+      const freshIncomeData = response?.data?.income || response?.income || response;
+      
+      setEditingIncome(freshIncomeData);
+      setFormData({
+        date: freshIncomeData.date || today(),
+        account_id: freshIncomeData.account?.id?.toString() || "",
+        source_id: freshIncomeData.source?.id?.toString() || "",
+        amount: freshIncomeData.amount?.toString() || "",
+        description: freshIncomeData.description || "",
+      });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || "Failed to load income data", { variant: "error" });
+      setIsDialogOpen(false);
+    } finally {
+      setIsLoadingIncome(false);
+    }
   };
 
   const handleDelete = (income: any) => {
@@ -415,37 +422,13 @@ export function IncomeList() {
 
           <Grid>
             <GridItem>
-              <Label className="text-green-800 flex items-center gap-1.5">
-                Date <span className="text-red-500">*</span>
-              </Label>
-              <Popover modal={false}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`w-full justify-between text-left font-normal h-11 border-green-200 hover:bg-green-50 ${
-                      !formData.date ? "text-green-400" : "text-green-800"
-                    }`}
-                  >
-                    {formData.date
-                      ? format(new Date(formData.date), "dd-MMM-yyyy")
-                      : "Select date"}
-                    <CalendarIcon className="w-4 h-4 text-emerald-600" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-white border-green-100" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.date ? new Date(formData.date) : undefined}
-                    onSelect={(date) =>
-                      setFormData({
-                        ...formData,
-                        date: date ? date.toISOString().slice(0, 10) : "",
-                      })
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <DatePicker
+                label="Date"
+                value={formData.date}
+                onChange={(date) => setFormData({ ...formData, date: date || today() })}
+                placeholder="Select date"
+                required
+              />
             </GridItem>
 
             <GridItem>

@@ -29,6 +29,7 @@ export function ProjectList() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -99,10 +100,23 @@ export function ProjectList() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (project: Project) => {
-    setEditingProject(project);
-    setFormData({ name: project.name });
+  const handleEdit = async (project: Project) => {
+    setIsLoadingProject(true);
     setIsDialogOpen(true);
+    
+    try {
+      // Fetch fresh project data from the API
+      const response = await projectService.getProject(project.id);
+      const freshProjectData = response?.data?.project || response?.project || response;
+      
+      setEditingProject(freshProjectData);
+      setFormData({ name: freshProjectData.name || "" });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || "Failed to load project data", { variant: "error" });
+      setIsDialogOpen(false);
+    } finally {
+      setIsLoadingProject(false);
+    }
   };
 
   const handleDelete = (project: Project) => {
