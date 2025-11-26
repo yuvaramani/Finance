@@ -34,6 +34,7 @@ import { AccountList } from "@features/accounts/components/AccountList";
 import { GroupList } from "@features/groups/components/GroupList";
 import { IncomeList } from "@features/income/components/IncomeList";
 import { ExpenseList } from "@features/expenses/components/ExpenseList";
+import { SalaryList } from "@features/salary/components/SalaryList";
 interface DashboardProps {
   onLogout: () => void;
 }
@@ -350,6 +351,8 @@ export function Dashboard({ onLogout }: DashboardProps) {
           <IncomeList />
         ) : activeMenu === "Expenses" ? (
           <ExpenseList />
+        ) : activeMenu === "Salary" ? (
+          <SalaryList />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Sidebar */}

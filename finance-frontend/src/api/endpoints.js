@@ -133,4 +133,13 @@ export const ENDPOINTS = {
     UPDATE: (id) => `/accounts/${id}`,
     DELETE: (id) => `/accounts/${id}`,
   },
+
+  // Salaries
+  SALARIES: {
+    LIST: '/salaries',
+    CREATE: '/salaries',
+    DETAIL: (id) => `/salaries/${id}`,
+    UPDATE: (id) => `/salaries/${id}`,
+    DELETE: (id) => `/salaries/${id}`,
+  },
 };
