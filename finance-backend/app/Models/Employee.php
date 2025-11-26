@@ -11,8 +11,8 @@ class Employee extends Model
 
     protected $fillable = [
         'name',
-        'acc_name',
-        'acc_number',
+        'account_name',
+        'account_number',
         'ifsc_code',
         'pan_no',
         'projects',

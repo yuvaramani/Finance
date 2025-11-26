@@ -148,8 +148,8 @@ class EmployeeController extends BaseController
     {
         $rules = [
             'name' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
-            'acc_name' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
-            'acc_number' => [
+            'account_name' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
+            'account_number' => [
                 $isUpdate ? 'sometimes' : 'required',
                 'string',
                 'max:30',
@@ -178,7 +178,20 @@ class EmployeeController extends BaseController
     private function transformPayload(array $data): array
     {
         if (array_key_exists('projects', $data) && is_array($data['projects'])) {
-            $data['projects'] = json_encode($data['projects']);
+            // Convert project IDs to integers and store as comma-separated string or JSON
+            $projectIds = array_map(function($project) {
+                // If it's already a number, use it; if it's a string, try to convert
+                if (is_numeric($project)) {
+                    return (int) $project;
+                }
+                // If it's a name, try to find the project ID (legacy support)
+                $projectModel = \App\Models\Project::where('name', $project)->first();
+                return $projectModel ? $projectModel->id : null;
+            }, $data['projects']);
+            
+            // Filter out null values and store as comma-separated string
+            $projectIds = array_filter($projectIds, fn($id) => $id !== null);
+            $data['projects'] = !empty($projectIds) ? implode(',', $projectIds) : null;
         }
 
         return $data;
@@ -191,12 +204,23 @@ class EmployeeController extends BaseController
         }
 
         if (is_array($value)) {
-            return $value;
+            // Convert to string IDs
+            return array_map(fn($id) => (string) $id, $value);
         }
 
+        // Try JSON decode first
         $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return array_map(fn($id) => (string) $id, $decoded);
+        }
 
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : [];
+        // If not JSON, treat as comma-separated string
+        if (is_string($value)) {
+            $ids = array_filter(array_map('trim', explode(',', $value)));
+            return array_map(fn($id) => (string) $id, $ids);
+        }
+
+        return [];
     }
 }
 
