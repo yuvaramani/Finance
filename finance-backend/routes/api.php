@@ -9,6 +9,7 @@ use App\Presentation\API\V1\Controllers\ExpenseCategoryController;
 use App\Presentation\API\V1\Controllers\ExpenseController;
 use App\Presentation\API\V1\Controllers\IncomeController;
 use App\Presentation\API\V1\Controllers\IncomeSourceController;
+use App\Presentation\API\V1\Controllers\SalaryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -67,6 +68,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('incomes', IncomeController::class);
     Route::apiResource('expense-categories', ExpenseCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('expenses', ExpenseController::class);
+    
+    // Salaries
+    Route::apiResource('salaries', SalaryController::class);
 
     // Financial management routes will be added here
     // Route::apiResource('accounts', AccountController::class);
