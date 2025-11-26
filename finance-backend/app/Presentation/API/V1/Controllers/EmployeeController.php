@@ -37,6 +37,8 @@ class EmployeeController extends BaseController
             return $this->successResponse([
                 'employees' => collect($employees->items())->map(function ($employee) {
                     $employee->projects = $this->decodeProjects($employee->projects);
+                    // Ensure salary is included - Laravel decimal cast returns string, convert to float
+                    $employee->salary = $employee->salary !== null ? (float) $employee->salary : 0;
                     return $employee;
                 }),
                 'meta' => [
@@ -77,6 +79,10 @@ class EmployeeController extends BaseController
      */
     public function show(Employee $employee): JsonResponse
     {
+        // Decode projects and ensure salary is properly formatted
+        $employee->projects = $this->decodeProjects($employee->projects);
+        $employee->salary = $employee->salary !== null ? (float) $employee->salary : 0;
+        
         return $this->successResponse([
             'employee' => $employee,
         ]);
@@ -164,6 +170,7 @@ class EmployeeController extends BaseController
                 'string',
                 'max:12',
             ],
+            'salary' => 'nullable|numeric|min:0',
             'projects' => 'nullable|array',
             'projects.*' => 'string|max:255',
             'status' => 'nullable|in:active,archived',

@@ -16,10 +16,12 @@ class Employee extends Model
         'ifsc_code',
         'pan_no',
         'projects',
+        'salary',
         'status',
     ];
 
     protected $casts = [
         'projects' => 'array',
+        'salary' => 'decimal:2',
     ];
 }
