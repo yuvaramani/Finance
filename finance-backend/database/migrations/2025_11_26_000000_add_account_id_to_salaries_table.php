@@ -12,6 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('salaries', function (Blueprint $table) {
+            if (Schema::hasColumn('salaries', 'account_id')) {
+                return;
+            }
             $table->foreignId('account_id')->nullable()->after('employee_id')->constrained('accounts')->onDelete('restrict');
             $table->index('account_id');
         });

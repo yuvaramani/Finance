@@ -26,12 +26,29 @@ class IncomeController extends BaseController
                 });
             }
 
+            if ($date = $request->input('date')) {
+                $query->whereDate('date', $date);
+            }
+
+            if ($accountId = $request->input('account_id')) {
+                $query->where('account_id', $accountId);
+            }
+
+            if ($sourceId = $request->input('source_id')) {
+                $query->where('source_id', $sourceId);
+            }
+
+            if ($amount = $request->input('amount')) {
+                $query->where('amount', $amount);
+            }
+
             $incomes = $query->get()->map(function ($income) {
                 return [
                     'id' => $income->id,
                     'date' => $income->date->toDateString(),
                     'amount' => $income->amount,
                     'description' => $income->description,
+                    'transaction_id' => $income->transaction_id,
                     'account' => [
                         'id' => $income->account?->id,
                         'name' => $income->account?->name,
@@ -122,6 +139,11 @@ class IncomeController extends BaseController
                 'nullable',
                 'string',
                 'max:1000',
+            ],
+            'transaction_id' => [
+                'nullable',
+                'string',
+                'max:255',
             ],
         ];
 

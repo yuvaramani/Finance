@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('accounts')) {
+            return;
+        }
+
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('group_id')->constrained('groups')->onDelete('restrict');

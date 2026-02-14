@@ -2,14 +2,6 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "./ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,8 +11,9 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Plus, Pencil, Archive, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { MultiSelect } from "./MultiSelect";
+import { DataTable, Column } from "./DataTable";
 
 interface Employee {
   id: number;
@@ -119,10 +112,10 @@ export function EmployeeList() {
     setIsDialogOpen(true);
   };
 
-  const handleArchive = (id: number) => {
+  const handleArchive = (employee: Employee) => {
     setEmployees((prev) =>
       prev.map((emp) =>
-        emp.id === id ? { ...emp, status: "archived" as const } : emp
+        emp.id === employee.id ? { ...emp, status: "archived" as const } : emp
       )
     );
   };
@@ -167,10 +160,54 @@ export function EmployeeList() {
     );
   });
 
+  // Define table columns
+  const columns: Column<Employee>[] = [
+    {
+      header: "Employee Name",
+      accessor: "name",
+      cellClassName: "text-green-800",
+    },
+    {
+      header: "Account Name",
+      accessor: "accName",
+    },
+    {
+      header: "Account Number",
+      accessor: "accNumber",
+      cellClassName: "text-green-700 font-mono text-sm",
+    },
+    {
+      header: "IFSC Code",
+      accessor: "ifscCode",
+      cellClassName: "text-green-700 font-mono text-sm",
+    },
+    {
+      header: "PAN No.",
+      accessor: "panNo",
+      cellClassName: "text-green-700 font-mono text-sm",
+    },
+    {
+      header: "Projects",
+      accessor: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.projects.map((project, idx) => (
+            <Badge
+              key={idx}
+              variant="outline"
+              className="bg-green-50 text-green-700 border-green-200 text-xs"
+            >
+              {project}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-3xl text-green-800">Employees</h1>
           <p className="text-sm text-green-600 mt-1">
@@ -180,7 +217,7 @@ export function EmployeeList() {
       </div>
 
       {/* Search Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-600" />
           <Input
@@ -201,89 +238,16 @@ export function EmployeeList() {
       </div>
 
       {/* Employee Table */}
-      <div>
-        <div className="border border-green-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-green-50/50 hover:bg-green-50/50">
-                <TableHead className="text-green-800">Employee Name</TableHead>
-                <TableHead className="text-green-800">Account Name</TableHead>
-                <TableHead className="text-green-800">Account Number</TableHead>
-                <TableHead className="text-green-800">IFSC Code</TableHead>
-                <TableHead className="text-green-800">PAN No.</TableHead>
-                <TableHead className="text-green-800">Projects</TableHead>
-                <TableHead className="text-green-800 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEmployees.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-green-600">
-                    No employees found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredEmployees.map((employee) => (
-                  <TableRow
-                    key={employee.id}
-                    className="hover:bg-green-50/30 transition-colors [&:hover_.action-buttons]:opacity-100"
-                  >
-                    <TableCell className="text-green-800">
-                      {employee.name}
-                    </TableCell>
-                    <TableCell className="text-green-700">
-                      {employee.accName}
-                    </TableCell>
-                    <TableCell className="text-green-700 font-mono text-sm">
-                      {employee.accNumber}
-                    </TableCell>
-                    <TableCell className="text-green-700 font-mono text-sm">
-                      {employee.ifscCode}
-                    </TableCell>
-                    <TableCell className="text-green-700 font-mono text-sm">
-                      {employee.panNo}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {employee.projects.map((project, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="outline"
-                            className="bg-green-50 text-green-700 border-green-200 text-xs"
-                          >
-                            {project}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 action-buttons opacity-0 transition-opacity duration-200">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() => handleEdit(employee)}
-                          title="Edit Employee"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
-                          onClick={() => handleArchive(employee.id)}
-                          title="Archive Employee"
-                        >
-                          <Archive className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+      <div className="flex-1 min-h-0">
+        <DataTable
+          data={filteredEmployees}
+          columns={columns}
+          onEdit={handleEdit}
+          onDelete={handleArchive}
+          emptyMessage="No employees found"
+          getRowKey={(row) => row.id}
+          pageSize={10}
+        />
       </div>
 
       {/* Add/Edit Dialog */}

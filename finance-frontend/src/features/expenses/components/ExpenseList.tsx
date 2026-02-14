@@ -45,6 +45,9 @@ export function ExpenseList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [isLoadingExpense, setIsLoadingExpense] = useState(false);
+  const [filterType, setFilterType] = useState("description");
+  const [filterValue, setFilterValue] = useState("");
+  const [activeFilter, setActiveFilter] = useState({ type: "description", value: "" });
   const [formData, setFormData] = useState({
     date: today(),
     account_id: "",
@@ -69,8 +72,18 @@ export function ExpenseList() {
     isError,
     error,
   } = useQuery({
-    queryKey: ["expenses", { search: searchQuery }],
-    queryFn: () => expenseService.getExpenses({ search: searchQuery }),
+    queryKey: ["expenses", activeFilter],
+    queryFn: () => {
+      const params: any = {};
+      if (activeFilter.value) {
+        if (activeFilter.type === 'description') params.search = activeFilter.value;
+        if (activeFilter.type === 'date') params.date = activeFilter.value;
+        if (activeFilter.type === 'account') params.account_id = activeFilter.value;
+        if (activeFilter.type === 'category') params.category_id = activeFilter.value;
+        if (activeFilter.type === 'amount') params.amount = activeFilter.value;
+      }
+      return expenseService.getExpenses(params);
+    },
     staleTime: 5 * 60 * 1000,
   });
 
@@ -112,7 +125,7 @@ export function ExpenseList() {
     isError: isCategoriesError,
   } = useQuery({
     queryKey: ["expenseCategories"],
-    queryFn: () => expenseCategoryService.getCategories(),
+    queryFn: () => expenseCategoryService.getExpenseCategories(),
     staleTime: 10 * 60 * 1000,
   });
 
@@ -145,20 +158,8 @@ export function ExpenseList() {
   const groups = Array.isArray(groupsRaw) ? groupsRaw : [];
 
   const filteredExpenses = useMemo(() => {
-    if (!searchQuery) return expenses;
-    return expenses.filter((expense: any) => {
-      const accountMatch = expense.account?.name
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const categoryMatch = expense.category?.name
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const descMatch = expense.description
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      return accountMatch || categoryMatch || descMatch;
-    });
-  }, [expenses, searchQuery]);
+    return expenses;
+  }, [expenses]);
 
   const createMutation = useMutation({
     mutationFn: (payload: any) => expenseService.createExpense(payload),
@@ -198,7 +199,7 @@ export function ExpenseList() {
 
   const addAccountMutation = useMutation({
     mutationFn: (payload: any) => accountService.createAccount(payload),
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["accounts", "dropdown"] });
       enqueueSnackbar("Account created", { variant: "success" });
       const created = data?.data?.account || data?.account || data;
@@ -221,8 +222,8 @@ export function ExpenseList() {
   });
 
   const addCategoryMutation = useMutation({
-    mutationFn: (payload: { name: string }) => expenseCategoryService.createCategory(payload),
-    onSuccess: (data) => {
+    mutationFn: (payload: { name: string }) => expenseCategoryService.createExpenseCategory(payload),
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["expenseCategories"] });
       enqueueSnackbar("Category created", { variant: "success" });
       const created = data?.data?.category || data?.category || data;
@@ -255,12 +256,12 @@ export function ExpenseList() {
   const handleEdit = async (expense: any) => {
     setIsLoadingExpense(true);
     setIsDialogOpen(true);
-    
+
     try {
       // Fetch fresh expense data from the API
       const response = await expenseService.getExpense(expense.id);
       const freshExpenseData = response?.data?.expense || response?.expense || response;
-      
+
       setEditingExpense(freshExpenseData);
       setFormData({
         date: freshExpenseData.date || today(),
@@ -344,8 +345,17 @@ export function ExpenseList() {
     },
   ];
 
+  const handleFilter = () => {
+    setActiveFilter({ type: filterType, value: filterValue });
+  };
+
+  const clearFilter = () => {
+    setFilterValue("");
+    setActiveFilter({ type: "description", value: "" });
+  };
+
   return (
-    <div className="flex flex-col h-full gap-6 overflow-hidden">
+    <div className="flex flex-col h-full w-full flex-1 gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Expenses</h1>
@@ -355,23 +365,107 @@ export function ExpenseList() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-600" />
-          <Input
-            placeholder="Search by account, category or notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 border-green-200 focus:border-green-400 focus:ring-green-400"
-          />
+      <div className="bg-white rounded-lg shadow-sm border border-green-100 p-2 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 flex-1">
+          <select
+            value={filterType}
+            onChange={(e) => {
+              setFilterType(e.target.value);
+              setFilterValue("");
+            }}
+            className="h-10 w-[150px] bg-gray-50 border border-green-200 rounded-md text-sm font-medium focus:ring-2 focus:ring-green-400 focus:border-transparent px-2 text-green-800 outline-none"
+          >
+            <option value="description">Description (Search)</option>
+            <option value="date">Date</option>
+            <option value="account">Account</option>
+            <option value="category">Category</option>
+            <option value="amount">Amount</option>
+          </select>
+
+          <div className="flex-1 max-w-[400px]">
+            {filterType === 'description' && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
+                <Input
+                  placeholder="Search description..."
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                  className="pl-9 h-10 border-green-200 focus:border-green-400 focus:ring-green-400 w-full"
+                />
+              </div>
+            )}
+            {filterType === 'date' && (
+              <Input
+                type="date"
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                className="h-10 border-green-200 focus:border-green-400 focus:ring-green-400 w-full"
+              />
+            )}
+            {filterType === 'account' && (
+              <select
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                className="h-10 w-full bg-white border border-green-200 rounded-md text-sm focus:ring-2 focus:ring-green-400 px-3 outline-none"
+              >
+                <option value="">Select Account</option>
+                {accounts.map((acc: any) => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                ))}
+              </select>
+            )}
+            {filterType === 'category' && (
+              <select
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                className="h-10 w-full bg-white border border-green-200 rounded-md text-sm focus:ring-2 focus:ring-green-400 px-3 outline-none"
+              >
+                <option value="">Select Category</option>
+                {categories.map((cat: any) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            )}
+            {filterType === 'amount' && (
+              <Input
+                type="number"
+                placeholder="Enter amount..."
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                className="h-10 border-green-200 focus:border-green-400 focus:ring-green-400 w-full"
+              />
+            )}
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleFilter}
+            className="h-10 w-10 text-green-600 hover:bg-green-50"
+            title="Apply Filter"
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+
+          {(activeFilter.value || filterValue) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={clearFilter}
+              className="h-10 w-10 text-gray-400 hover:text-red-500 hover:bg-red-50"
+              title="Clear Filter"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
+
         <Button
           onClick={handleAddNew}
-          size="icon"
-          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-10 w-10"
-          title="Add Expense"
+          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-md h-10 px-4"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-5 h-5 mr-2" />
+          Add Expense
         </Button>
       </div>
 

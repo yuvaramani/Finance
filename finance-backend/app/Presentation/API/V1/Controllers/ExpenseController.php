@@ -26,12 +26,29 @@ class ExpenseController extends BaseController
                 });
             }
 
+            if ($date = $request->input('date')) {
+                $query->whereDate('date', $date);
+            }
+
+            if ($accountId = $request->input('account_id')) {
+                $query->where('account_id', $accountId);
+            }
+
+            if ($categoryId = $request->input('category_id')) {
+                $query->where('category_id', $categoryId);
+            }
+
+            if ($amount = $request->input('amount')) {
+                $query->where('amount', $amount);
+            }
+
             $expenses = $query->get()->map(function ($expense) {
                 return [
                     'id' => $expense->id,
                     'date' => $expense->date->toDateString(),
                     'amount' => $expense->amount,
                     'description' => $expense->description,
+                    'transaction_id' => $expense->transaction_id,
                     'account' => [
                         'id' => $expense->account?->id,
                         'name' => $expense->account?->name,
@@ -123,11 +140,23 @@ class ExpenseController extends BaseController
                 'string',
                 'max:1000',
             ],
+            'transaction_id' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
         ];
 
         return $request->validate($rules);
     }
 }
+
+
+
+
+
+
+
 
 
 

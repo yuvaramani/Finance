@@ -10,6 +10,10 @@ use App\Presentation\API\V1\Controllers\ExpenseController;
 use App\Presentation\API\V1\Controllers\IncomeController;
 use App\Presentation\API\V1\Controllers\IncomeSourceController;
 use App\Presentation\API\V1\Controllers\SalaryController;
+use App\Http\Controllers\Api\StatementImportController;
+use App\Http\Controllers\Api\SalaryImportController;
+use App\Http\Controllers\Api\TdsExportController;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -71,6 +75,15 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Salaries
     Route::apiResource('salaries', SalaryController::class);
+    Route::post('/salaries/parse', [SalaryImportController::class, 'parse']);
+
+    // Statement Import
+    Route::post('/statements/parse', [StatementImportController::class, 'parse']);
+
+    // TDS Export
+    Route::get('/tds/quarter-export', [TdsExportController::class, 'exportQuarter']);
+
+
 
     // Financial management routes will be added here
     // Route::apiResource('accounts', AccountController::class);

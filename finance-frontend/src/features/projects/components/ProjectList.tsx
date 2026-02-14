@@ -103,12 +103,12 @@ export function ProjectList() {
   const handleEdit = async (project: Project) => {
     setIsLoadingProject(true);
     setIsDialogOpen(true);
-    
+
     try {
       // Fetch fresh project data from the API
       const response = await projectService.getProject(project.id);
       const freshProjectData = response?.data?.project || response?.project || response;
-      
+
       setEditingProject(freshProjectData);
       setFormData({ name: freshProjectData.name || "" });
     } catch (error: any) {
@@ -159,7 +159,7 @@ export function ProjectList() {
   ];
 
   return (
-    <div className="flex flex-col h-full gap-6 overflow-hidden">
+    <div className="flex flex-col h-full w-full flex-1 gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Projects</h1>

@@ -1,26 +1,42 @@
+
 import axiosInstance from '../axios';
-import { ENDPOINTS } from '../endpoints';
 
 export const expenseCategoryService = {
-  async getCategories(params = {}) {
-    const response = await axiosInstance.get(ENDPOINTS.EXPENSE_CATEGORIES.LIST, { params });
-    return response.data || response;
+  /**
+   * Get all expense categories
+   */
+  async getExpenseCategories() {
+    const response = await axiosInstance.get('/expense-categories');
+    return response;
   },
 
-  async createCategory(data) {
-    const response = await axiosInstance.post(ENDPOINTS.EXPENSE_CATEGORIES.CREATE, data);
-    return response.data || response;
+  /**
+   * Create a new expense category
+   * @param {Object} data - { name }
+   */
+  async createExpenseCategory(data) {
+    const response = await axiosInstance.post('/expense-categories', data);
+    return response;
   },
 
-  async updateCategory(id, data) {
-    const response = await axiosInstance.put(ENDPOINTS.EXPENSE_CATEGORIES.UPDATE(id), data);
-    return response.data || response;
+  /**
+   * Update an expense category
+   * @param {number} id
+   * @param {Object} data - { name }
+   */
+  async updateExpenseCategory(id, data) {
+    const response = await axiosInstance.put(`/expense-categories/${id}`, data);
+    return response;
   },
 
-  async deleteCategory(id) {
-    return axiosInstance.delete(ENDPOINTS.EXPENSE_CATEGORIES.DELETE(id));
-  },
+  /**
+   * Delete an expense category
+   * @param {number} id
+   */
+  async deleteExpenseCategory(id) {
+    const response = await axiosInstance.delete(`/expense-categories/${id}`);
+    return response;
+  }
 };
-
 
 

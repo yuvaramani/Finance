@@ -45,11 +45,14 @@ class SalaryController extends BaseController
                 return [
                     'id' => $salary->id,
                     'date' => $salary->date->toDateString(),
-                    'salary' => $salary->salary,
-                    'tds' => $salary->tds,
+                    'salary' => $salary->gross_salary ?? $salary->salary ?? 0, // Backward compatibility
+                    'gross_salary' => $salary->gross_salary ?? $salary->salary ?? 0,
+                    'tds' => $salary->tds ?? 0,
+                    'net_salary' => $salary->net_salary ?? 0,
                     'employee' => [
                         'id' => $salary->employee?->id,
                         'name' => $salary->employee?->name,
+                        'pan_no' => $salary->employee?->pan_no,
                     ],
                     'account' => [
                         'id' => $salary->account?->id,
@@ -119,11 +122,20 @@ class SalaryController extends BaseController
             'date' => $isUpdate ? 'sometimes|required|date' : 'required|date',
             'employee_id' => $isUpdate ? 'sometimes|required|exists:employees,id' : 'required|exists:employees,id',
             'account_id' => $isUpdate ? 'sometimes|nullable|exists:accounts,id' : 'nullable|exists:accounts,id',
-            'salary' => $isUpdate ? 'sometimes|required|numeric|min:0' : 'required|numeric|min:0',
+            'gross_salary' => $isUpdate ? 'sometimes|required|numeric|min:0' : 'required|numeric|min:0',
             'tds' => 'nullable|numeric|min:0',
+            'net_salary' => 'nullable|numeric|min:0',
         ];
 
-        return $request->validate($rules);
+        $validated = $request->validate($rules);
+        
+        // Backward compatibility: if 'salary' is sent instead of 'gross_salary', use it
+        if (isset($validated['salary']) && !isset($validated['gross_salary'])) {
+            $validated['gross_salary'] = $validated['salary'];
+            unset($validated['salary']);
+        }
+        
+        return $validated;
     }
 }
 

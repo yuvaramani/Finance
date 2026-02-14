@@ -16,6 +16,7 @@ class Expense extends Model
         'category_id',
         'amount',
         'description',
+        'transaction_id',
     ];
 
     protected $casts = [
@@ -33,6 +34,13 @@ class Expense extends Model
         return $this->belongsTo(ExpenseCategory::class, 'category_id');
     }
 }
+
+
+
+
+
+
+
 
 
 

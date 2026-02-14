@@ -42,7 +42,6 @@ export function AccountList() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
-  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     group_id: "",
@@ -100,12 +99,75 @@ export function AccountList() {
 
   const createMutation = useMutation<any, any, AccountPayload>({
     mutationFn: accountService.createAccount,
-    onSuccess: () => {
+    onMutate: async (newAccount) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["accounts"] });
+
+      // Snapshot previous value
+      const previousAccounts = queryClient.getQueryData(["accounts", { search: searchQuery }]);
+
+      // Generate temporary ID
+      const tempId = `temp-${Date.now()}`;
+
+      // Optimistically update cache
+      queryClient.setQueryData(["accounts", { search: searchQuery }], (old: any) => {
+        const newAccountData = {
+          id: tempId,
+          ...newAccount,
+          group_name: groups.find((g: any) => g.id === newAccount.group_id)?.name || "",
+          balance: newAccount.balance || 0,
+          status: newAccount.status || "Active",
+        };
+
+        const accountsList = Array.isArray(old?.data?.accounts) ? old.data.accounts :
+          Array.isArray(old?.accounts) ? old.accounts :
+            Array.isArray(old?.data) ? old.data :
+              Array.isArray(old) ? old : [];
+
+        return {
+          ...old,
+          data: {
+            ...old?.data,
+            accounts: [...accountsList, newAccountData],
+          },
+        };
+      });
+
+      return { previousAccounts, tempId };
+    },
+    onSuccess: (data, variables, context: any) => {
+      // Update with real data from server
+      const createdAccount = data?.data?.account || data?.account || data;
+      queryClient.setQueryData(["accounts", { search: searchQuery }], (old: any) => {
+        const accountsList = Array.isArray(old?.data?.accounts) ? old.data.accounts :
+          Array.isArray(old?.accounts) ? old.accounts :
+            Array.isArray(old?.data) ? old.data :
+              Array.isArray(old) ? old : [];
+
+        // Replace temporary account with real one
+        const updatedList = accountsList.map((acc: any) =>
+          acc.id === context?.tempId ? createdAccount : acc
+        );
+
+        return {
+          ...old,
+          data: {
+            ...old?.data,
+            accounts: updatedList,
+          },
+        };
+      });
+
+      // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       enqueueSnackbar("Account created successfully", { variant: "success" });
       resetDialog();
     },
-    onError: (err: any) => {
+    onError: (err: any, newAccount, context: any) => {
+      // Rollback on error
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(["accounts", { search: searchQuery }], context.previousAccounts);
+      }
       enqueueSnackbar(err?.message || "Failed to create account", { variant: "error" });
     },
   });
@@ -133,23 +195,112 @@ export function AccountList() {
   const updateMutation = useMutation<any, any, { id: number; data: AccountPayload }>({
     mutationFn: ({ id, data }) =>
       accountService.updateAccount(id, data),
-    onSuccess: () => {
+    onMutate: async ({ id, data }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["accounts"] });
+
+      // Snapshot previous value
+      const previousAccounts = queryClient.getQueryData(["accounts", { search: searchQuery }]);
+
+      // Optimistically update cache
+      queryClient.setQueryData(["accounts", { search: searchQuery }], (old: any) => {
+        const accountsList = Array.isArray(old?.data?.accounts) ? old.data.accounts :
+          Array.isArray(old?.accounts) ? old.accounts :
+            Array.isArray(old?.data) ? old.data :
+              Array.isArray(old) ? old : [];
+
+        const updatedList = accountsList.map((acc: any) =>
+          acc.id === id ? {
+            ...acc,
+            ...data,
+            group_name: groups.find((g: any) => g.id === data.group_id)?.name || acc.group_name,
+          } : acc
+        );
+
+        return {
+          ...old,
+          data: {
+            ...old?.data,
+            accounts: updatedList,
+          },
+        };
+      });
+
+      return { previousAccounts };
+    },
+    onSuccess: (data, variables) => {
+      // Update with real data from server
+      const updatedAccount = data?.data?.account || data?.account || data;
+      queryClient.setQueryData(["accounts", { search: searchQuery }], (old: any) => {
+        const accountsList = Array.isArray(old?.data?.accounts) ? old.data.accounts :
+          Array.isArray(old?.accounts) ? old.accounts :
+            Array.isArray(old?.data) ? old.data :
+              Array.isArray(old) ? old : [];
+
+        const updatedList = accountsList.map((acc: any) =>
+          acc.id === variables.id ? updatedAccount : acc
+        );
+
+        return {
+          ...old,
+          data: {
+            ...old?.data,
+            accounts: updatedList,
+          },
+        };
+      });
+
+      // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       enqueueSnackbar("Account updated successfully", { variant: "success" });
       resetDialog();
     },
-    onError: (err: any) => {
+    onError: (err: any, variables, context: any) => {
+      // Rollback on error
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(["accounts", { search: searchQuery }], context.previousAccounts);
+      }
       enqueueSnackbar(err?.message || "Failed to update account", { variant: "error" });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => accountService.deleteAccount(id),
+    onMutate: async (id) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["accounts"] });
+
+      // Snapshot previous value
+      const previousAccounts = queryClient.getQueryData(["accounts", { search: searchQuery }]);
+
+      // Optimistically remove from cache
+      queryClient.setQueryData(["accounts", { search: searchQuery }], (old: any) => {
+        const accountsList = Array.isArray(old?.data?.accounts) ? old.data.accounts :
+          Array.isArray(old?.accounts) ? old.accounts :
+            Array.isArray(old?.data) ? old.data :
+              Array.isArray(old) ? old : [];
+
+        return {
+          ...old,
+          data: {
+            ...old?.data,
+            accounts: accountsList.filter((acc: any) => acc.id !== id),
+          },
+        };
+      });
+
+      return { previousAccounts };
+    },
     onSuccess: () => {
+      // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       enqueueSnackbar("Account deleted successfully", { variant: "success" });
     },
-    onError: (err: any) => {
+    onError: (err: any, id, context: any) => {
+      // Rollback on error
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(["accounts", { search: searchQuery }], context.previousAccounts);
+      }
       enqueueSnackbar(err?.message || "Failed to delete account", { variant: "error" });
     },
   });
@@ -165,28 +316,16 @@ export function AccountList() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = async (account: any) => {
-    setIsLoadingAccount(true);
+  const handleEdit = (account: any) => {
+    // Use account data directly from the list - no need to fetch from API
+    setEditingAccount(account);
+    setFormData({
+      group_id: account.group_id?.toString() ?? "",
+      name: account.name ?? "",
+      status: account.status ?? "Active",
+      balance: account.balance?.toString() ?? "0",
+    });
     setIsDialogOpen(true);
-    
-    try {
-      // Fetch fresh account data from the API
-      const response = await accountService.getAccount(account.id);
-      const freshAccountData = response?.data?.account || response?.account || response;
-      
-      setEditingAccount(freshAccountData);
-      setFormData({
-        group_id: freshAccountData.group_id?.toString() ?? "",
-        name: freshAccountData.name ?? "",
-        status: freshAccountData.status ?? "Active",
-        balance: freshAccountData.balance?.toString() ?? "0",
-      });
-    } catch (error: any) {
-      enqueueSnackbar(error?.message || "Failed to load account data", { variant: "error" });
-      setIsDialogOpen(false);
-    } finally {
-      setIsLoadingAccount(false);
-    }
   };
 
   const handleDelete = (account: any) => {
@@ -223,6 +362,17 @@ export function AccountList() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  // Calculate total balance from filtered accounts
+  const totalBalance = accounts.reduce((sum, account) => {
+    return sum + Number(account.balance || 0);
+  }, 0);
+
+  const formatCurrency = (value: number) =>
+    `₹${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
   const columns: Column<any>[] = [
     {
       header: "Account Name",
@@ -250,10 +400,18 @@ export function AccountList() {
   ];
 
   return (
-    <div className="flex flex-col h-full gap-6 overflow-hidden">
+    <div className="flex flex-col h-full w-full flex-1 gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-green-800">Accounts</h1>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl text-green-800">Accounts</h1>
+            <div className="text-right ml-4">
+              <span className="text-sm text-green-600 font-medium">Balance: </span>
+              <span className="text-2xl text-green-700 font-semibold">
+                {formatCurrency(totalBalance)}
+              </span>
+            </div>
+          </div>
           <p className="text-sm text-green-600 mt-1">
             Create and manage the accounts you use for transactions
           </p>
@@ -315,15 +473,7 @@ export function AccountList() {
               Provide the account information below
             </DialogDescription>
           </DialogHeader>
-          {isLoadingAccount ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="flex items-center gap-3 text-green-700">
-                <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
-                <span>Loading account data...</span>
-              </div>
-            </div>
-          ) : (
-            <Grid>
+          <Grid>
             <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
                 Group <span className="text-red-500">*</span>
@@ -333,7 +483,7 @@ export function AccountList() {
                   value={formData.group_id}
                   onChange={(value) => setFormData({ ...formData, group_id: value })}
                   placeholder="- Select -"
-                  disabled={isGroupsLoading || isGroupsError || isLoadingAccount}
+                  disabled={isGroupsLoading || isGroupsError}
                   options={groups.map((group: any) => ({
                     value: group.id?.toString(),
                     label: group.name,
@@ -346,7 +496,7 @@ export function AccountList() {
                   variant="outline"
                   className="h-11 w-11 border-green-200 text-green-700 hover:bg-green-50 flex-shrink-0"
                   onClick={() => setIsAddGroupDialogOpen(true)}
-                  disabled={addGroupMutation.isPending || isLoadingAccount}
+                  disabled={addGroupMutation.isPending}
                   title="Add Group"
                 >
                   {addGroupMutation.isPending ? (
@@ -362,12 +512,12 @@ export function AccountList() {
               <Label className="text-green-800 flex items-center gap-1.5">
                 Name <span className="text-red-500">*</span>
               </Label>
-                <Input
+              <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="For ex: My Wallet, Bank Account"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
-                disabled={isLoadingAccount}
+                disabled={isSaving}
               />
             </GridItem>
 
@@ -380,7 +530,7 @@ export function AccountList() {
                   value: option.value,
                   label: option.label,
                 }))}
-                disabled={isLoadingAccount}
+                disabled={isSaving}
               />
               <div className="text-sm text-green-700 space-y-1">
                 <p><strong>Active</strong>: You can add transactions like Income, Expense, and Transfers to this account.</p>
@@ -395,20 +545,16 @@ export function AccountList() {
                 value={formData.balance}
                 onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
-                disabled={isLoadingAccount}
+                disabled={isSaving}
               />
             </GridItem>
           </Grid>
-          )}
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                resetDialog();
-                setIsLoadingAccount(false);
-              }}
+              onClick={resetDialog}
               className="border-green-200 text-green-700 hover:bg-green-50 h-11 px-6"
-              disabled={isSaving || isLoadingAccount}
+              disabled={isSaving}
             >
               Reset
             </Button>
@@ -417,7 +563,6 @@ export function AccountList() {
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md h-11 px-6"
               disabled={
                 isSaving ||
-                isLoadingAccount ||
                 !formData.group_id ||
                 !formData.name.trim()
               }

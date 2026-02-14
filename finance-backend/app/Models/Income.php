@@ -16,6 +16,7 @@ class Income extends Model
         'source_id',
         'amount',
         'description',
+        'transaction_id',
     ];
 
     protected $casts = [

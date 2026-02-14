@@ -284,12 +284,12 @@ export function EmployeeList() {
   const handleEdit = async (employee: Employee) => {
     setIsLoadingEmployee(true);
     setIsDialogOpen(true);
-    
+
     try {
       // Fetch fresh employee data from the API
       const response = await employeeService.getEmployee(employee.id);
       const freshEmployeeData = response?.data?.employee || response?.employee || response;
-      
+
       // Normalize the fresh employee data using the same logic
       const projectMap = new Map<number, string>();
       projectsList.forEach((project: any) => {
@@ -297,9 +297,9 @@ export function EmployeeList() {
           projectMap.set(project.id, project.name);
         }
       });
-      
+
       const normalizedEmployee = normalizeEmployees([freshEmployeeData], projectMap)[0];
-      
+
       setEditingEmployee(normalizedEmployee);
       setFormData({
         name: normalizedEmployee.name,
@@ -412,7 +412,7 @@ export function EmployeeList() {
   ];
 
   return (
-    <div className="flex flex-col h-full gap-6 overflow-hidden">
+    <div className="flex flex-col h-full w-full flex-1 gap-6 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -498,176 +498,176 @@ export function EmployeeList() {
             </DialogDescription>
           </DialogHeader>
           {isLoadingEmployee ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="flex items-center gap-3 text-green-700">
-                  <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
-                  <span>Loading employee data...</span>
-                </div>
+            <div className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-3 text-green-700">
+                <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+                <span>Loading employee data...</span>
               </div>
-            ) : (
-              <Grid>
-            <GridItem>
-              <Label htmlFor="name" className="text-green-800 flex items-center gap-1.5">
-                Employee Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Enter full name"
-                className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
-                disabled={isLoadingEmployee}
-              />
-            </GridItem>
-            <GridItem>
-              <Label htmlFor="accName" className="text-green-800 flex items-center gap-1.5">
-                Account Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="accName"
-                value={formData.accName}
-                onChange={(e) =>
-                  setFormData({ ...formData, accName: e.target.value })
-                }
-                placeholder="Enter account holder name"
-                className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
-                disabled={isLoadingEmployee}
-              />
-            </GridItem>
-            <GridItem>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="accNumber" className="text-green-800 flex items-center gap-1.5">
-                    Account Number <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="accNumber"
-                    value={formData.accNumber}
-                    onChange={(e) =>
-                      setFormData({ ...formData, accNumber: e.target.value })
-                    }
-                    placeholder="Enter account number"
-                    className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
-                    disabled={isLoadingEmployee}
-                  />
+            </div>
+          ) : (
+            <Grid>
+              <GridItem>
+                <Label htmlFor="name" className="text-green-800 flex items-center gap-1.5">
+                  Employee Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="Enter full name"
+                  className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
+                  disabled={isLoadingEmployee}
+                />
+              </GridItem>
+              <GridItem>
+                <Label htmlFor="accName" className="text-green-800 flex items-center gap-1.5">
+                  Account Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="accName"
+                  value={formData.accName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, accName: e.target.value })
+                  }
+                  placeholder="Enter account holder name"
+                  className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
+                  disabled={isLoadingEmployee}
+                />
+              </GridItem>
+              <GridItem>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="accNumber" className="text-green-800 flex items-center gap-1.5">
+                      Account Number <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="accNumber"
+                      value={formData.accNumber}
+                      onChange={(e) =>
+                        setFormData({ ...formData, accNumber: e.target.value })
+                      }
+                      placeholder="Enter account number"
+                      className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
+                      disabled={isLoadingEmployee}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ifscCode" className="text-green-800 flex items-center gap-1.5">
+                      IFSC Code <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="ifscCode"
+                      value={formData.ifscCode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })
+                      }
+                      placeholder="Enter IFSC code"
+                      className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
+                      disabled={isLoadingEmployee}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="ifscCode" className="text-green-800 flex items-center gap-1.5">
-                    IFSC Code <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="ifscCode"
-                    value={formData.ifscCode}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })
-                    }
-                    placeholder="Enter IFSC code"
-                    className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
-                    disabled={isLoadingEmployee}
-                  />
+              </GridItem>
+              <GridItem>
+                <Label htmlFor="panNo" className="text-green-800 flex items-center gap-1.5">
+                  PAN Number <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="panNo"
+                  value={formData.panNo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, panNo: e.target.value.toUpperCase() })
+                  }
+                  placeholder="Enter PAN number"
+                  className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
+                  maxLength={10}
+                  disabled={isLoadingEmployee}
+                />
+              </GridItem>
+              <GridItem>
+                <Label htmlFor="salary" className="text-green-800">
+                  Salary
+                </Label>
+                <Input
+                  id="salary"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.salary}
+                  onChange={(e) =>
+                    setFormData({ ...formData, salary: e.target.value })
+                  }
+                  placeholder="Enter salary amount"
+                  className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
+                  disabled={isLoadingEmployee}
+                />
+              </GridItem>
+              <GridItem>
+                <Label htmlFor="projects" className="text-green-800">
+                  Projects
+                </Label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <MultiSelect
+                      options={availableProjects.map((id) => {
+                        const name = projectMap.get(parseInt(id, 10)) || id;
+                        return `${id}:${name}`; // Format: "ID:Name" for display
+                      })}
+                      selected={formData.projects.map((id) => {
+                        const name = projectMap.get(parseInt(id, 10)) || id;
+                        return `${id}:${name}`;
+                      })}
+                      onChange={(selected) => {
+                        // Extract IDs from "ID:Name" format
+                        const projectIds = selected.map((item) => {
+                          const parts = item.split(':');
+                          return parts[0]; // Return the ID part
+                        });
+                        setFormData({ ...formData, projects: projectIds });
+                      }}
+                      placeholder={
+                        isProjectsLoading
+                          ? "Loading projects..."
+                          : isProjectsError
+                            ? "Failed to load projects"
+                            : "Select projects"
+                      }
+                      disabled={isProjectsLoading || isProjectsError || isLoadingEmployee}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-11 w-11 border-green-200 text-green-700 hover:bg-green-50 flex-shrink-0"
+                    onClick={() => setIsAddProjectDialogOpen(true)}
+                    title="Add New Project"
+                    disabled={isProjectsLoading || addProjectMutation.isPending || isLoadingEmployee}
+                  >
+                    {addProjectMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-5 h-5" />
+                    )}
+                  </Button>
                 </div>
-              </div>
-            </GridItem>
-            <GridItem>
-              <Label htmlFor="panNo" className="text-green-800 flex items-center gap-1.5">
-                PAN Number <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="panNo"
-                value={formData.panNo}
-                onChange={(e) =>
-                  setFormData({ ...formData, panNo: e.target.value.toUpperCase() })
-                }
-                placeholder="Enter PAN number"
-                className="border-green-200 focus:border-green-400 focus:ring-green-400 font-mono h-11"
-                maxLength={10}
-                disabled={isLoadingEmployee}
-              />
-            </GridItem>
-            <GridItem>
-              <Label htmlFor="salary" className="text-green-800">
-                Salary
-              </Label>
-              <Input
-                id="salary"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.salary}
-                onChange={(e) =>
-                  setFormData({ ...formData, salary: e.target.value })
-                }
-                placeholder="Enter salary amount"
-                className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
-                disabled={isLoadingEmployee}
-              />
-            </GridItem>
-            <GridItem>
-              <Label htmlFor="projects" className="text-green-800">
-                Projects
-              </Label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <MultiSelect
-                    options={availableProjects.map((id) => {
-                      const name = projectMap.get(parseInt(id, 10)) || id;
-                      return `${id}:${name}`; // Format: "ID:Name" for display
-                    })}
-                    selected={formData.projects.map((id) => {
-                      const name = projectMap.get(parseInt(id, 10)) || id;
-                      return `${id}:${name}`;
-                    })}
-                    onChange={(selected) => {
-                      // Extract IDs from "ID:Name" format
-                      const projectIds = selected.map((item) => {
-                        const parts = item.split(':');
-                        return parts[0]; // Return the ID part
-                      });
-                      setFormData({ ...formData, projects: projectIds });
-                    }}
-                    placeholder={
-                      isProjectsLoading
-                        ? "Loading projects..."
-                        : isProjectsError
-                          ? "Failed to load projects"
-                          : "Select projects"
-                    }
-                    disabled={isProjectsLoading || isProjectsError || isLoadingEmployee}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-11 w-11 border-green-200 text-green-700 hover:bg-green-50 flex-shrink-0"
-                  onClick={() => setIsAddProjectDialogOpen(true)}
-                  title="Add New Project"
-                  disabled={isProjectsLoading || addProjectMutation.isPending || isLoadingEmployee}
-                >
-                  {addProjectMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Plus className="w-5 h-5" />
-                  )}
-                </Button>
-              </div>
-            </GridItem>
+              </GridItem>
             </Grid>
           )}
           <DialogFooter className="border-t border-green-100 pt-4 gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsDialogOpen(false);
-                  setIsLoadingEmployee(false);
-                }}
-                className="border-green-200 text-green-700 hover:bg-green-50 h-11 px-6"
-                disabled={isSaving || isLoadingEmployee}
-              >
-                Cancel
-              </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDialogOpen(false);
+                setIsLoadingEmployee(false);
+              }}
+              className="border-green-200 text-green-700 hover:bg-green-50 h-11 px-6"
+              disabled={isSaving || isLoadingEmployee}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleSave}
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md h-11 px-6"

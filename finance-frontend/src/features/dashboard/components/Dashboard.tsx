@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Button } from "@components/ui/button";
 import { Avatar, AvatarFallback } from "@components/ui/avatar";
@@ -23,7 +24,9 @@ import {
   Settings,
   LayoutDashboard,
   Banknote,
-  FileDown
+  FileDown,
+  FileSpreadsheet,
+  Tag
 } from "lucide-react";
 import { CashflowChart } from "./CashflowChart";
 import { ExpenseDonutChart } from "./ExpenseDonutChart";
@@ -33,8 +36,16 @@ import { ProjectList } from "@features/projects/components/ProjectList";
 import { AccountList } from "@features/accounts/components/AccountList";
 import { GroupList } from "@features/groups/components/GroupList";
 import { IncomeList } from "@features/income/components/IncomeList";
+import ImportStatementPage from "@features/import/ImportStatementPage";
 import { ExpenseList } from "@features/expenses/components/ExpenseList";
 import { SalaryList } from "@features/salary/components/SalaryList";
+import { TdsQuarterly } from "@features/tds/components/TdsQuarterly";
+import { StatementFormatList } from "@features/statement-formats/components/StatementFormatList";
+import { IncomeCategoryList } from "@features/categories/components/IncomeCategoryList";
+import { ExpenseCategoryList } from "@features/categories/components/ExpenseCategoryList";
+import { incomeService } from "@api/services/incomeService";
+import { salaryService } from "@api/services/salaryService";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 interface DashboardProps {
   onLogout: () => void;
 }
@@ -83,6 +94,84 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
+
+  const { data: incomesData } = useQuery({
+    queryKey: ["dashboard-incomes"],
+    queryFn: () => incomeService.getIncomes(),
+    enabled: activeMenu === "Dashboard",
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: salariesData } = useQuery({
+    queryKey: ["dashboard-salaries"],
+    queryFn: () => salaryService.getSalaries(),
+    enabled: activeMenu === "Dashboard",
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const incomesRaw =
+    (incomesData as any)?.data?.incomes ||
+    (incomesData as any)?.incomes ||
+    (incomesData as any)?.data ||
+    incomesData ||
+    [];
+  const incomes = Array.isArray(incomesRaw) ? incomesRaw : [];
+
+  const salariesRaw =
+    (salariesData as any)?.data?.salaries ||
+    (salariesData as any)?.salaries ||
+    (salariesData as any)?.data ||
+    salariesData ||
+    [];
+  const salaries = Array.isArray(salariesRaw) ? salariesRaw : [];
+
+  const totalIncomeAmount = incomes.reduce((sum: number, income: any) => {
+    return sum + Number(income.amount || 0);
+  }, 0);
+
+  const totalSalaryGrossAmount = salaries.reduce((sum: number, salary: any) => {
+    return sum + Number(salary.gross_salary ?? salary.salary ?? 0);
+  }, 0);
+
+  const leftOutAmount = totalIncomeAmount - totalSalaryGrossAmount;
+  const leftOutPercent = totalIncomeAmount > 0 ? (leftOutAmount / totalIncomeAmount) * 100 : 0;
+  const leftOutPercentSafe = Number.isFinite(leftOutPercent) ? leftOutPercent : 0;
+
+  const leftOutColorHex = leftOutPercentSafe <= 30
+    ? "#16a34a"
+    : leftOutPercentSafe <= 50
+      ? "#d97706"
+      : "#dc2626";
+
+  const leftOutColorClass = leftOutPercentSafe <= 30
+    ? "text-green-700 border-green-200 bg-green-50"
+    : leftOutPercentSafe <= 50
+      ? "text-amber-700 border-amber-200 bg-amber-50"
+      : "text-red-700 border-red-200 bg-red-50";
+
+  const salaryVsLeftOutData = useMemo(() => {
+    if (totalIncomeAmount <= 0) {
+      return [
+        { name: "Salary", value: 0, color: "#0f766e" },
+        { name: "Left Out", value: 0, color: leftOutColorHex },
+      ];
+    }
+
+    const salaryWithinIncome = Math.max(0, Math.min(totalSalaryGrossAmount, totalIncomeAmount));
+    const leftOutWithinIncome = Math.max(totalIncomeAmount - salaryWithinIncome, 0);
+
+    return [
+      { name: "Salary", value: salaryWithinIncome, color: "#0f766e" },
+      { name: "Left Out", value: leftOutWithinIncome, color: leftOutColorHex },
+    ];
+  }, [totalIncomeAmount, totalSalaryGrossAmount, leftOutColorHex]);
+
+  const formatMoney = (value: number) =>
+    `₹${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
   const totalBalance = mockBankBalances.reduce((sum, bank) => sum + bank.balance, 0);
   const totalIncome = mockMonthlyData.reduce((sum, data) => sum + data.income, 0);
   const totalExpenses = mockExpenseCategories.reduce((sum, cat) => sum + cat.value, 0);
@@ -92,7 +181,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const savingsPercentage = ((savings / currentMonthIncome) * 100).toFixed(1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50/30 to-emerald-50/50">
+    <div className={`bg-gradient-to-br from-slate-50 via-green-50/30 to-emerald-50/50 ${activeMenu === "Salary" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
       {/* Header */}
       <header className="bg-white border-b border-green-100/50 shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/95">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -101,7 +190,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
               <div>
                 <h1 className="text-green-800">Income & Expense Tracker</h1>
               </div>
-              
+
               {/* Navigation Menu */}
               <nav className="hidden lg:flex items-center gap-2">
                 {/* Dashboard */}
@@ -214,6 +303,28 @@ export function Dashboard({ onLogout }: DashboardProps) {
                   TDS
                 </Button>
 
+                {/* Import Statement */}
+                <Button
+                  size="sm"
+                  variant={activeMenu === "Import" ? "default" : "ghost"}
+                  onMouseEnter={() => setHoveredMenu("Import")}
+                  onMouseLeave={() => setHoveredMenu(null)}
+                  style={{
+                    backgroundColor: activeMenu === "Import"
+                      ? undefined
+                      : hoveredMenu === "Import"
+                        ? "#dcfce7"
+                        : undefined
+                  }}
+                  className={activeMenu === "Import"
+                    ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white"
+                    : "text-green-700 transition-all"}
+                  onClick={() => setActiveMenu("Import")}
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+                  Import
+                </Button>
+
                 {/* Settings Menu */}
                 <div
                   className="relative"
@@ -228,15 +339,15 @@ export function Dashboard({ onLogout }: DashboardProps) {
                 >
                   <Button
                     size="sm"
-                    variant={["Accounts", "Employees", "Projects", "Groups"].includes(activeMenu) ? "default" : "ghost"}
+                    variant={["Accounts", "Employees", "Projects", "Groups", "StatementFormats"].includes(activeMenu) ? "default" : "ghost"}
                     style={{
-                      backgroundColor: ["Accounts", "Employees", "Projects", "Groups"].includes(activeMenu)
+                      backgroundColor: ["Accounts", "Employees", "Projects", "Groups", "StatementFormats"].includes(activeMenu)
                         ? undefined
                         : hoveredMenu === "Settings"
                           ? "#dcfce7"
                           : undefined
                     }}
-                    className={["Accounts", "Employees", "Projects", "Groups"].includes(activeMenu)
+                    className={["Accounts", "Employees", "Projects", "Groups", "StatementFormats"].includes(activeMenu)
                       ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white"
                       : "text-green-700 transition-all"}
                   >
@@ -307,13 +418,58 @@ export function Dashboard({ onLogout }: DashboardProps) {
                           <Building2 className="w-4 h-4" />
                           Groups
                         </button>
+                        <button
+                          onMouseEnter={() => setHoveredItem("StatementFormats")}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          style={{
+                            backgroundColor: hoveredItem === "StatementFormats" ? "#dcfce7" : "transparent"
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-green-700 flex items-center gap-2 transition-all cursor-pointer"
+                          onClick={() => {
+                            setActiveMenu("StatementFormats");
+                            setIsSettingsOpen(false);
+                          }}
+                        >
+                          <FileText className="w-4 h-4" />
+                          Statement Format
+                        </button>
+                        <button
+                          onMouseEnter={() => setHoveredItem("IncomeCategories")}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          style={{
+                            backgroundColor: hoveredItem === "IncomeCategories" ? "#dcfce7" : "transparent"
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-green-700 flex items-center gap-2 transition-all cursor-pointer"
+                          onClick={() => {
+                            setActiveMenu("IncomeCategories");
+                            setIsSettingsOpen(false);
+                          }}
+                        >
+                          <Tag className="w-4 h-4" />
+                          Income Category
+                        </button>
+                        <button
+                          onMouseEnter={() => setHoveredItem("ExpenseCategories")}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          style={{
+                            backgroundColor: hoveredItem === "ExpenseCategories" ? "#dcfce7" : "transparent"
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-green-700 flex items-center gap-2 transition-all cursor-pointer"
+                          onClick={() => {
+                            setActiveMenu("ExpenseCategories");
+                            setIsSettingsOpen(false);
+                          }}
+                        >
+                          <Tag className="w-4 h-4" />
+                          Expense Category
+                        </button>
                       </div>
                     </div>
                   )}
                 </div>
               </nav>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm text-green-800">Andrew Forbist</p>
@@ -338,7 +494,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className={`max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 ${activeMenu !== "Dashboard" ? "h-[calc(100vh-4.5rem)] flex flex-col overflow-hidden pt-6" : "py-6"}`}>
         {activeMenu === "Employees" ? (
           <EmployeeList />
         ) : activeMenu === "Projects" ? (
@@ -353,202 +509,209 @@ export function Dashboard({ onLogout }: DashboardProps) {
           <ExpenseList />
         ) : activeMenu === "Salary" ? (
           <SalaryList />
+        ) : activeMenu === "TDS" ? (
+          <TdsQuarterly />
+        ) : activeMenu === "StatementFormats" ? (
+          <StatementFormatList />
+        ) : activeMenu === "Import" ? (
+          <ImportStatementPage />
+        ) : activeMenu === "IncomeCategories" ? (
+          <IncomeCategoryList />
+        ) : activeMenu === "ExpenseCategories" ? (
+          <ExpenseCategoryList />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Balance Card */}
-            <Card className="border-green-100 bg-gradient-to-br from-white to-green-50/30 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-green-600 flex items-center gap-2 text-xs">
-                  <Wallet className="w-3.5 h-3.5" />
-                  Total Balance
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pb-4">
-                <h3 className="text-green-800">₹{totalBalance.toLocaleString('en-IN')}</h3>
-                <p className="text-xs text-green-600 mt-2">Across all accounts</p>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-green-800 text-base">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button className="w-full justify-start bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Income
-                </Button>
-                <Button variant="outline" className="w-full justify-start border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Expense
-                </Button>
-                <Button variant="outline" className="w-full justify-start border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm">
-                  <Users className="w-4 h-4 mr-2" />
-                  Pay Salary
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Bank Accounts */}
-            <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-green-800 text-base">Bank Accounts</CardTitle>
-                <CardDescription>Current balances</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {mockBankBalances.map((bank) => (
-                  <div key={bank.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-green-50/50 transition-colors">
-                    <div className="flex items-center gap-2">
-                      {bank.name === "Cash" ? (
-                        <Wallet className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Building2 className="w-4 h-4 text-green-600" />
-                      )}
-                      <span className="text-sm text-green-700">{bank.name}</span>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+              <Card className="xl:col-span-9 border-green-100 bg-gradient-to-br from-white to-green-50/30 shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-green-800 text-base flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
+                      <CreditCard className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-sm text-green-800">₹{bank.balance.toLocaleString('en-IN')}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content Area */}
-          <div className="lg:col-span-6 space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card className="border-green-100 bg-gradient-to-br from-white to-green-50/30 shadow-md hover:shadow-xl transition-all hover:-translate-y-1 duration-300">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <TrendingUp className="w-5 h-5 text-white" />
+                    Income vs Salary
+                  </CardTitle>
+                  <CardDescription>Left out % = (Income - Salary Gross) / Income</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-1">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
+                    <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-green-100 bg-white px-3 py-2">
+                        <p className="text-xs text-green-600">Total Income</p>
+                        <p className="text-green-900">{formatMoney(totalIncomeAmount)}</p>
+                      </div>
+                      <div className="rounded-lg border border-green-100 bg-white px-3 py-2">
+                        <p className="text-xs text-green-600">Total Salary (Gross)</p>
+                        <p className="text-green-900">{formatMoney(totalSalaryGrossAmount)}</p>
+                      </div>
+                      <div className="rounded-lg border border-green-100 bg-white px-3 py-2 sm:col-span-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-green-600">Left Out Amount</p>
+                            <p className={leftOutAmount >= 0 ? "text-green-900" : "text-red-700"}>
+                              {formatMoney(leftOutAmount)}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className={leftOutColorClass}>
+                            {leftOutPercentSafe <= 30
+                              ? "Healthy (<=30%)"
+                              : leftOutPercentSafe <= 50
+                                ? "Watch (30-50%)"
+                                : "High (>50%)"}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant="outline" className="border-green-200 text-green-700 bg-green-50 text-xs">
-                      <ArrowUpRight className="w-3 h-3 mr-1" />
-                      +12.5%
-                    </Badge>
+
+                    <div className="h-[170px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={salaryVsLeftOutData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={40}
+                            outerRadius={65}
+                            paddingAngle={4}
+                            stroke="none"
+                          >
+                            {salaryVsLeftOutData.map((entry, index) => (
+                              <Cell key={`salary-leftout-top-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="mt-[-100px] text-center pointer-events-none">
+                        <p className="text-xs text-green-700">Left Out %</p>
+                        <p className="text-2xl text-green-900">{leftOutPercentSafe.toFixed(1)}%</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-green-600 mb-1">Total Income</p>
-                  <h3 className="text-green-800">₹{totalIncome.toLocaleString('en-IN')}</h3>
                 </CardContent>
               </Card>
 
-              <Card className="border-orange-100 bg-gradient-to-br from-white to-orange-50/30 shadow-md hover:shadow-xl transition-all hover:-translate-y-1 duration-300">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
-                      <TrendingDown className="w-5 h-5 text-white" />
-                    </div>
-                    <Badge variant="outline" className="border-orange-200 text-orange-700 bg-orange-50 text-xs">
-                      <ArrowDownRight className="w-3 h-3 mr-1" />
-                      -8.2%
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-orange-600 mb-1">Total Expense</p>
-                  <h3 className="text-orange-800">₹{totalExpenses.toLocaleString('en-IN')}</h3>
-                </CardContent>
-              </Card>
-
-              <Card className="border-blue-100 bg-gradient-to-br from-white to-blue-50/30 shadow-md hover:shadow-xl transition-all hover:-translate-y-1 duration-300">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <DollarSign className="w-5 h-5 text-white" />
-                    </div>
-                    <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 text-xs">
-                      {savingsPercentage}%
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-blue-600 mb-1">Total Savings</p>
-                  <h3 className="text-blue-800">₹{savings.toLocaleString('en-IN')}</h3>
+              <Card className="xl:col-span-3 border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-green-800 text-base">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button className="w-full justify-start bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Income
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Expense
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm">
+                    <Users className="w-4 h-4 mr-2" />
+                    Pay Salary
+                  </Button>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Cashflow Chart */}
-            <CashflowChart data={mockMonthlyData} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <Card className="border-green-100 bg-gradient-to-br from-white to-green-50/30 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="pt-4 pb-4">
+                  <p className="text-xs text-green-600 mb-1">Total Balance</p>
+                  <h3 className="text-green-800">{formatMoney(totalBalance)}</h3>
+                  <p className="text-xs text-green-600 mt-1">Across all accounts</p>
+                </CardContent>
+              </Card>
+              <Card className="border-green-100 bg-gradient-to-br from-white to-green-50/30 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="pt-4 pb-4">
+                  <p className="text-xs text-green-600 mb-1">Total Income</p>
+                  <h3 className="text-green-800">{formatMoney(totalIncome)}</h3>
+                  <p className="text-xs text-green-600 mt-1">YTD (mock trend)</p>
+                </CardContent>
+              </Card>
+              <Card className="border-orange-100 bg-gradient-to-br from-white to-orange-50/30 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="pt-4 pb-4">
+                  <p className="text-xs text-orange-600 mb-1">Total Expense</p>
+                  <h3 className="text-orange-800">{formatMoney(totalExpenses)}</h3>
+                  <p className="text-xs text-orange-600 mt-1">Category aggregate</p>
+                </CardContent>
+              </Card>
+              <Card className="border-blue-100 bg-gradient-to-br from-white to-blue-50/30 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="pt-4 pb-4">
+                  <p className="text-xs text-blue-600 mb-1">Total Savings</p>
+                  <h3 className="text-blue-800">{formatMoney(savings)}</h3>
+                  <p className="text-xs text-blue-600 mt-1">{savingsPercentage}% this month</p>
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Recent Transactions */}
-            <RecentTransactions transactions={mockRecentTransactions} />
-          </div>
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+              <div className="xl:col-span-8 space-y-4">
+                <CashflowChart data={mockMonthlyData} />
+                <RecentTransactions transactions={mockRecentTransactions} />
+              </div>
 
-          {/* Right Sidebar */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Expense Statistics */}
-            <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-green-800 text-base">Statistics</CardTitle>
-                  <Button variant="ghost" size="sm" className="text-green-600 hover:bg-green-50">
-                    This Month
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ExpenseDonutChart data={mockExpenseCategories} />
-              </CardContent>
-            </Card>
+              <div className="xl:col-span-4 space-y-4">
+                <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-green-800 text-base">Statistics</CardTitle>
+                      <Button variant="ghost" size="sm" className="text-green-600 hover:bg-green-50">
+                        This Month
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <ExpenseDonutChart data={mockExpenseCategories} />
+                  </CardContent>
+                </Card>
 
-            {/* Expense Breakdown */}
-            <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-green-800 text-base">Expense Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {mockExpenseCategories.map((category) => (
-                  <div key={category.name} className="flex items-center justify-between p-2 rounded-lg hover:bg-green-50/50 transition-colors">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div 
-                        className="w-3 h-3 rounded-full shadow-sm"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <span className="text-sm text-green-700">{category.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-md">{category.percentage}%</span>
-                      <span className="text-sm text-green-800">₹{(category.value / 1000).toFixed(1)}k</span>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-green-800 text-base">Expense Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {mockExpenseCategories.map((category) => (
+                      <div key={category.name} className="flex items-center justify-between p-2 rounded-lg hover:bg-green-50/50 transition-colors">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div
+                            className="w-3 h-3 rounded-full shadow-sm"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <span className="text-sm text-green-700">{category.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-md">{category.percentage}%</span>
+                          <span className="text-sm text-green-800">{formatMoney(category.value)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
 
-            {/* Salary Summary */}
-            <Card className="border-purple-100 bg-gradient-to-br from-purple-50 to-white shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-purple-800 text-base flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
-                    <Users className="w-4 h-4 text-white" />
-                  </div>
-                  Salary Paid (2024)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <h3 className="text-purple-800 mb-2">₹1,83,000</h3>
-                <p className="text-sm text-purple-600 mb-4">2 Employees • 11 months</p>
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-white border border-purple-100">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700">John Doe</span>
-                      <span className="text-sm text-purple-800">₹99,000</span>
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-white border border-purple-100">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700">Jane Smith</span>
-                      <span className="text-sm text-purple-800">₹84,000</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Card className="border-green-100 bg-white shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-green-800 text-base">Bank Accounts</CardTitle>
+                    <CardDescription>Current balances</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {mockBankBalances.map((bank) => (
+                      <div key={bank.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-green-50/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          {bank.name === "Cash" ? (
+                            <Wallet className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Building2 className="w-4 h-4 text-green-600" />
+                          )}
+                          <span className="text-sm text-green-700">{bank.name}</span>
+                        </div>
+                        <span className="text-sm text-green-800">{formatMoney(bank.balance)}</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         )}
       </main>
     </div>
   );
 }
+

@@ -22,6 +22,8 @@ import {
   Search,
   Trash2,
   Filter,
+  Upload,
+  FileSpreadsheet,
 } from "lucide-react";
 import { salaryService } from "@api/services/salaryService";
 import { employeeService } from "@api/services/employeeService";
@@ -45,10 +47,12 @@ export function SalaryList() {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isIndividualDialogOpen, setIsIndividualDialogOpen] = useState(false);
   const [isBatchStep1DialogOpen, setIsBatchStep1DialogOpen] = useState(false);
   const [isBatchStep2DialogOpen, setIsBatchStep2DialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingSalary, setEditingSalary] = useState<any>(null);
   const [isLoadingSalary, setIsLoadingSalary] = useState(false);
   
@@ -71,6 +75,11 @@ export function SalaryList() {
 
   const [batchStep2Data, setBatchStep2Data] = useState<Record<number, { selected: boolean; net_salary: string; tds: string; gross_salary: string }>>({});
 
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importAccountId, setImportAccountId] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+
   // Add account dialog state
   const [isAddAccountDialogOpen, setIsAddAccountDialogOpen] = useState(false);
   const [accountForm, setAccountForm] = useState({
@@ -86,10 +95,11 @@ export function SalaryList() {
     isError,
     error,
   } = useQuery({
-    queryKey: ["salaries", { from_date: fromDate, to_date: toDate }],
+    queryKey: ["salaries", { from_date: fromDate, to_date: toDate, employee_id: employeeFilter }],
     queryFn: () => salaryService.getSalaries({ 
       from_date: fromDate || undefined,
       to_date: toDate || undefined,
+      employee_id: employeeFilter || undefined,
     }),
     staleTime: 5 * 60 * 1000,
   });
@@ -102,6 +112,11 @@ export function SalaryList() {
     [];
 
   const salaries = Array.isArray(salariesRaw) ? salariesRaw : [];
+
+  const totalSalary = salaries.reduce((sum: number, salary: any) => {
+    const gross = Number(salary.gross_salary ?? salary.salary ?? 0);
+    return sum + (gross || 0);
+  }, 0);
 
   // Fetch employees
   const {
@@ -213,18 +228,18 @@ export function SalaryList() {
     }));
   }, [batchStep1Data.project_id, employees]);
 
-  // Calculate TDS and Gross Salary for individual form
+  // Calculate Net Salary for individual form (Net = Gross - TDS)
   useMemo(() => {
-    if (individualFormData.net_salary) {
-      const netSalary = parseFloat(individualFormData.net_salary) || 0;
+    if (individualFormData.gross_salary !== "") {
+      const grossSalary = parseFloat(individualFormData.gross_salary) || 0;
       const tds = parseFloat(individualFormData.tds) || 0;
-      const grossSalary = netSalary - tds;
+      const netSalary = grossSalary - tds;
       setIndividualFormData(prev => ({
         ...prev,
-        gross_salary: grossSalary > 0 ? grossSalary.toFixed(2) : "0",
+        net_salary: netSalary > 0 ? netSalary.toFixed(2) : "0",
       }));
     }
-  }, [individualFormData.net_salary, individualFormData.tds]);
+  }, [individualFormData.gross_salary, individualFormData.tds]);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => salaryService.createSalary(data),
@@ -294,6 +309,21 @@ export function SalaryList() {
     },
   });
 
+  const importMutation = useMutation({
+    mutationFn: async (salaries: any[]) => {
+      const promises = salaries.map((salary) => salaryService.createSalary(salary));
+      return Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      enqueueSnackbar("Imported salary payments successfully", { variant: "success" });
+      resetImportDialog();
+    },
+    onError: (err: any) => {
+      enqueueSnackbar(err?.message || "Failed to import salary payments", { variant: "error" });
+    },
+  });
+
   const handleAddClick = () => {
     setIsAddDialogOpen(true);
   };
@@ -308,13 +338,19 @@ export function SalaryList() {
     setIsBatchStep1DialogOpen(true);
   };
 
+  const handleAddImport = () => {
+    setIsAddDialogOpen(false);
+    setIsImportDialogOpen(true);
+  };
+
   const handleIndividualSave = () => {
     const payload = {
       date: individualFormData.date,
       employee_id: Number(individualFormData.employee_id),
       account_id: individualFormData.account_id ? Number(individualFormData.account_id) : null,
-      salary: Number(individualFormData.net_salary || 0), // Storing as net_salary in DB
+      gross_salary: Number(individualFormData.gross_salary || 0),
       tds: Number(individualFormData.tds || 0),
+      net_salary: Number(individualFormData.net_salary || 0),
     };
 
     if (editingSalary) {
@@ -337,14 +373,14 @@ export function SalaryList() {
     batchEmployees.forEach((emp: any) => {
       // Get salary from employee master - check multiple possible field names
       const defaultSalary = (emp.salary || emp.salary_amount || 0).toString();
-      const netSalary = defaultSalary && defaultSalary !== "0" ? defaultSalary : "";
-      const tds = netSalary ? (parseFloat(netSalary) * 0.1).toFixed(2) : "0";
-      const grossSalary = netSalary ? (parseFloat(netSalary) - parseFloat(tds)).toFixed(2) : "0";
+      const grossSalary = defaultSalary && defaultSalary !== "0" ? defaultSalary : "";
+      const tds = grossSalary ? (parseFloat(grossSalary) * 0.1).toFixed(2) : "0";
+      const netSalary = grossSalary ? (parseFloat(grossSalary) - parseFloat(tds)).toFixed(2) : "0";
       initialData[emp.id] = { 
         selected: true, 
-        net_salary: netSalary,
+        gross_salary: grossSalary,
         tds: tds,
-        gross_salary: grossSalary
+        net_salary: netSalary
       };
     });
     setBatchStep2Data(initialData);
@@ -352,14 +388,20 @@ export function SalaryList() {
 
   const handleBatchStep2Save = () => {
     const selectedEmployees = Object.entries(batchStep2Data)
-      .filter(([_, data]) => data.selected && data.net_salary)
-      .map(([empId, data]) => ({
-        date: batchStep1Data.date,
-        employee_id: Number(empId),
-        account_id: Number(batchStep1Data.account_id),
-        salary: Number(data.net_salary),
-        tds: Number(data.tds || 0),
-      }));
+      .filter(([_, data]) => data.selected && data.gross_salary)
+      .map(([empId, data]) => {
+        const gross = Number(data.gross_salary || 0);
+        const tds = Number(data.tds || 0);
+        const net = Number(data.net_salary || 0);
+        return {
+          date: batchStep1Data.date,
+          employee_id: Number(empId),
+          account_id: Number(batchStep1Data.account_id),
+          gross_salary: gross,
+          tds: tds,
+          net_salary: net,
+        };
+      });
 
     if (selectedEmployees.length === 0) {
       enqueueSnackbar("Please select at least one employee with salary", { variant: "error" });
@@ -367,6 +409,82 @@ export function SalaryList() {
     }
 
     createBatchMutation.mutate(selectedEmployees);
+  };
+
+  const handleImportPreview = async () => {
+    if (!importFile) {
+      enqueueSnackbar("Please select an Excel file", { variant: "warning" });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const response = await salaryService.parseSalaryImport(importFile);
+
+      let rows: any[] = [];
+      if (Array.isArray((response as any)?.data)) {
+        rows = (response as any).data;
+      } else if (Array.isArray((response as any)?.data?.data)) {
+        rows = (response as any).data.data;
+      } else if (Array.isArray((response as any)?.data?.rows)) {
+        rows = (response as any).data.rows;
+      } else if (Array.isArray((response as any)?.data?.salaries)) {
+        rows = (response as any).data.salaries;
+      } else if (Array.isArray(response as any)) {
+        rows = response as any[];
+      }
+
+      if (!Array.isArray(rows)) {
+        rows = [];
+      }
+
+      setImportRows(rows);
+      enqueueSnackbar(`Parsed ${rows.length} rows`, { variant: "success" });
+    } catch (err: any) {
+      enqueueSnackbar(err?.message || "Failed to parse Excel file", { variant: "error" });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleImportRowDelete = (row: any) => {
+    setImportRows((prev) => prev.filter((r) => r.id !== row.id));
+  };
+
+  const resetImportDialog = () => {
+    setIsImportDialogOpen(false);
+    setImportFile(null);
+    setImportRows([]);
+    setImportAccountId("");
+    setIsImporting(false);
+  };
+
+  const handleImportSave = () => {
+    if (!importAccountId) {
+      enqueueSnackbar("Please select an account", { variant: "warning" });
+      return;
+    }
+    if (importRows.length === 0) {
+      enqueueSnackbar("No rows to import", { variant: "warning" });
+      return;
+    }
+
+    const invalidRows = importRows.filter((r) => Array.isArray(r.warnings) && r.warnings.length > 0);
+    if (invalidRows.length > 0) {
+      enqueueSnackbar(`Please fix the Excel file and re-upload. ${invalidRows.length} row(s) have warnings.`, { variant: "warning" });
+      return;
+    }
+
+    const payload = importRows.map((row) => ({
+      date: row.date,
+      employee_id: Number(row.employee_id),
+      account_id: Number(importAccountId),
+      gross_salary: Number(row.gross_salary || 0),
+      tds: Number(row.tds || 0),
+      net_salary: Number(row.net_salary || 0),
+    }));
+
+    importMutation.mutate(payload);
   };
 
   const handleEdit = async (salary: any) => {
@@ -379,13 +497,17 @@ export function SalaryList() {
       const freshSalaryData = response?.data?.salary || response?.salary || response;
       
       setEditingSalary(freshSalaryData);
+      const grossValue = Number(freshSalaryData.gross_salary ?? freshSalaryData.salary ?? 0);
+      const tdsValue = Number(freshSalaryData.tds ?? 0);
+      const netValue = Number(freshSalaryData.net_salary ?? (grossValue - tdsValue));
+
       setIndividualFormData({
         date: freshSalaryData.date || today(),
         employee_id: freshSalaryData.employee?.id?.toString() || "",
         account_id: freshSalaryData.account?.id?.toString() || "",
-        net_salary: freshSalaryData.salary?.toString() || freshSalaryData.net_salary?.toString() || "",
-        tds: freshSalaryData.tds?.toString() || "0",
-        gross_salary: ((freshSalaryData.salary || freshSalaryData.net_salary || 0) - (freshSalaryData.tds || 0)).toFixed(2),
+        gross_salary: grossValue.toString(),
+        tds: tdsValue.toString(),
+        net_salary: netValue.toFixed(2),
       });
     } catch (error: any) {
       enqueueSnackbar(error?.message || "Failed to load salary data", { variant: "error" });
@@ -426,9 +548,22 @@ export function SalaryList() {
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending || createBatchMutation.isPending;
+  const isImportSaving = importMutation.isPending;
+
+  const importTotals = useMemo(() => {
+    return importRows.reduce(
+      (acc, row) => {
+        acc.gross += Number(row.gross_salary || 0);
+        acc.tds += Number(row.tds || 0);
+        acc.net += Number(row.net_salary || 0);
+        return acc;
+      },
+      { gross: 0, tds: 0, net: 0 }
+    );
+  }, [importRows]);
 
   // Calculate Net Salary, TDS, Gross Salary for display
-  // Based on screenshot: Net Salary = what company pays, TDS = tax, Gross Salary = Net - TDS
+  // Net = Gross - TDS
   const columns: Column<any>[] = [
     {
       header: "Date",
@@ -444,7 +579,11 @@ export function SalaryList() {
       header: "Net Salary",
       accessor: (salary) => (
         <span className="text-green-700 font-semibold">
-          {formatCurrency(salary.salary)}
+          {formatCurrency(
+            salary.net_salary !== undefined && salary.net_salary !== null
+              ? salary.net_salary
+              : (Number(salary.gross_salary ?? salary.salary ?? 0) - Number(salary.tds ?? 0))
+          )}
         </span>
       ),
     },
@@ -459,7 +598,7 @@ export function SalaryList() {
     {
       header: "Gross Salary",
       accessor: (salary) => {
-        const grossSalary = (salary.salary || 0) - (salary.tds || 0);
+        const grossSalary = Number(salary.gross_salary ?? salary.salary ?? 0);
         return (
           <span className="text-green-800 font-semibold">
             {formatCurrency(grossSalary)}
@@ -472,16 +611,24 @@ export function SalaryList() {
   return (
     <div className="flex flex-col h-full gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-green-800">Salary Management</h1>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl text-green-800">Salary Management</h1>
+            <div className="text-right ml-4">
+              <span className="text-sm text-green-600 font-medium">Total Salary: </span>
+              <span className="text-2xl text-green-700 font-semibold">
+                {formatCurrency(totalSalary)}
+              </span>
+            </div>
+          </div>
           <p className="text-sm text-green-600 mt-1">
             Track and manage employee salary payments
           </p>
         </div>
       </div>
 
-      {/* Date Filters */}
-      <div className="flex items-center gap-3">
+      {/* Date & Employee Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-green-600" />
         <div className="flex items-center gap-2">
           <Label className="text-green-700 text-sm">Date</Label>
@@ -496,6 +643,20 @@ export function SalaryList() {
             onChange={(date) => setToDate(date || "")}
             placeholder="To Date"
             inputClassName="h-9"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-green-700 text-sm">Employee</Label>
+          <StyledSelect
+            value={employeeFilter}
+            onChange={(value) => setEmployeeFilter(value)}
+            placeholder="All Employees"
+            disabled={isEmployeesLoading || isEmployeesError}
+            options={employees.map((employee: any) => ({
+              value: employee.id?.toString(),
+              label: employee.name,
+            }))}
+            className="min-w-[220px]"
           />
         </div>
         <div className="flex-1" />
@@ -559,6 +720,12 @@ export function SalaryList() {
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 h-12"
             >
               Add Batch
+            </Button>
+            <Button
+              onClick={handleAddImport}
+              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 h-12"
+            >
+              Import Excel
             </Button>
           </div>
         </DialogContent>
@@ -641,23 +808,23 @@ export function SalaryList() {
 
             <GridItem>
               <Label className="text-green-800 flex items-center gap-1.5">
-                Net Salary <span className="text-red-500">*</span>
+                Gross Salary <span className="text-red-500">*</span>
               </Label>
               <Input
                 type="number"
                 min="0"
                 step="0.01"
-                value={individualFormData.net_salary}
+                value={individualFormData.gross_salary}
                 onChange={(e) => {
-                  const netSalary = e.target.value;
-                  const tds = (parseFloat(netSalary) * 0.1).toFixed(2);
+                  const grossSalary = e.target.value;
+                  const tds = (parseFloat(grossSalary) * 0.1).toFixed(2);
                   setIndividualFormData({
                     ...individualFormData,
-                    net_salary: netSalary,
+                    gross_salary: grossSalary,
                     tds: tds,
                   });
                 }}
-                placeholder="Enter net salary"
+                placeholder="Enter gross salary"
                 className="border-green-200 focus:border-green-400 focus:ring-green-400 h-11"
               />
             </GridItem>
@@ -676,10 +843,10 @@ export function SalaryList() {
             </GridItem>
 
             <GridItem>
-              <Label className="text-green-800">Gross Salary</Label>
+              <Label className="text-green-800">Net Salary</Label>
               <Input
                 type="number"
-                value={individualFormData.gross_salary}
+                value={individualFormData.net_salary}
                 disabled
                 className="border-green-200 bg-green-50 h-11"
               />
@@ -702,7 +869,7 @@ export function SalaryList() {
                 !individualFormData.date ||
                 !individualFormData.employee_id ||
                 !individualFormData.account_id ||
-                !individualFormData.net_salary
+                !individualFormData.gross_salary
               }
             >
               {isSaving ? (
@@ -714,6 +881,177 @@ export function SalaryList() {
                 editingSalary ? "Update Entry" : "Add Entry"
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Salary Dialog */}
+      <Dialog
+        open={isImportDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetImportDialog();
+          } else {
+            setIsImportDialogOpen(true);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[1000px] bg-white border-green-200 shadow-xl rounded-lg">
+          <DialogHeader className="border-b border-green-100 pb-4">
+            <DialogTitle className="text-green-800 text-xl flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              Import Salary from Excel
+            </DialogTitle>
+            <DialogDescription className="text-green-600 text-sm">
+              Upload the Excel file and preview rows before saving. If warnings exist, fix the Excel and re-upload.
+            </DialogDescription>
+          </DialogHeader>
+
+          {importRows.length === 0 ? (
+            <div className="space-y-6 py-2">
+              <div className="space-y-2">
+                <Label className="text-green-800">Account <span className="text-red-500">*</span></Label>
+                <StyledSelect
+                  value={importAccountId}
+                  onChange={(value) => setImportAccountId(value)}
+                  placeholder="- Select -"
+                  disabled={isAccountsLoading || isAccountsError}
+                  options={accounts.map((account: any) => ({
+                    value: account.id?.toString(),
+                    label: account.name,
+                  }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-green-800">Excel File (.xlsx) <span className="text-red-500">*</span></Label>
+                <div className="border-2 border-dashed border-green-200 rounded-lg p-8 text-center bg-green-50/30 hover:bg-green-50/50 transition-colors cursor-pointer relative">
+                  <Input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center gap-2 pointer-events-none">
+                    <Upload className="w-8 h-8 text-green-600" />
+                    <span className="text-sm text-green-700 font-medium">
+                      {importFile ? importFile.name : "Click to upload or drag and drop"}
+                    </span>
+                    {!importFile && (
+                      <span className="text-xs text-green-500">
+                        Header row required. Columns: Date, Account, Debit
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {importRows.some((r) => Array.isArray(r.warnings) && r.warnings.length > 0) && (
+                <div className="text-sm text-red-600">
+                  Some rows are not matched. Please fix the Excel file and re-upload before saving.
+                </div>
+              )}
+              <div className="h-[420px]">
+                <DataTable
+                  data={importRows}
+                  columns={[
+                    { header: "Row", accessor: (row) => row.row_index ?? row.rowIndex ?? row.id, cellClassName: "text-green-800" },
+                    { header: "Date", accessor: (row) => row.date || "—", cellClassName: "text-green-800" },
+                    {
+                      header: "Account",
+                      accessor: (row) => (
+                        <span className={row.employee_id ? "text-green-800" : "text-red-600"}>
+                          {row.account || "—"}
+                        </span>
+                      ),
+                    },
+                    {
+                      header: "Gross",
+                      accessor: (row) => formatCurrency(row.gross_salary || 0),
+                      className: "text-right",
+                      cellClassName: "text-green-800 text-right",
+                    },
+                    {
+                      header: "TDS (10%)",
+                      accessor: (row) => formatCurrency(row.tds || 0),
+                      className: "text-right",
+                      cellClassName: "text-red-600 text-right",
+                    },
+                    {
+                      header: "Net",
+                      accessor: (row) => formatCurrency(row.net_salary || 0),
+                      className: "text-right",
+                      cellClassName: "text-green-800 text-right",
+                    },
+                  ]}
+                  getRowKey={(row) => row.id}
+                  onDelete={handleImportRowDelete}
+                  showPagination={false}
+                  autoCalculatePageSize={false}
+                  pageSize={Math.max(importRows.length, 1)}
+                  bodyClassName="overflow-auto max-h-[420px]"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-6 text-sm text-green-800">
+                <div>Gross: <span className="font-semibold">{formatCurrency(importTotals.gross)}</span></div>
+                <div>TDS: <span className="font-semibold text-red-600">{formatCurrency(importTotals.tds)}</span></div>
+                <div>Net: <span className="font-semibold">{formatCurrency(importTotals.net)}</span></div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="border-t border-green-100 pt-4 gap-2">
+            <Button
+              variant="outline"
+              onClick={resetImportDialog}
+              className="border-green-200 text-green-700 hover:bg-green-50 h-11 px-6"
+              disabled={isImporting || isImportSaving}
+            >
+              Cancel
+            </Button>
+            {importRows.length === 0 ? (
+              <Button
+                onClick={handleImportPreview}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md h-11 px-6"
+                disabled={!importFile || isImporting || !importAccountId}
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Parsing...
+                  </>
+                ) : (
+                  "Import & Preview"
+                )}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setImportRows([])}
+                  className="border-green-200 text-green-700 hover:bg-green-50 h-11 px-6"
+                  disabled={isImportSaving}
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleImportSave}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-md h-11 px-6"
+                  disabled={isImportSaving}
+                >
+                  {isImportSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Imported Rows"
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -836,12 +1174,12 @@ export function SalaryList() {
                     onCheckedChange={(checked) => {
                       const newData = { ...batchStep2Data };
                       batchEmployees.forEach((emp: any) => {
-                        const currentData = newData[emp.id] || { net_salary: "", tds: "0", gross_salary: "0" };
+                        const currentData = newData[emp.id] || { gross_salary: "", tds: "0", net_salary: "0" };
                         newData[emp.id] = {
                           selected: checked as boolean,
-                          net_salary: currentData.net_salary || "",
+                          gross_salary: currentData.gross_salary || "",
                           tds: currentData.tds || "0",
-                          gross_salary: currentData.gross_salary || "0",
+                          net_salary: currentData.net_salary || "0",
                         };
                       });
                       setBatchStep2Data(newData);
@@ -849,9 +1187,9 @@ export function SalaryList() {
                   />
                   <span>Employee Name</span>
                 </div>
-                <span className="text-center">Net Salary</span>
-                <span className="text-center">TDS (10%)</span>
                 <span className="text-center">Gross Salary</span>
+                <span className="text-center">TDS (10%)</span>
+                <span className="text-center">Net Salary</span>
               </div>
               
               {/* Employee Rows */}
@@ -861,14 +1199,14 @@ export function SalaryList() {
                 if (!empData) {
                   // Initialize with employee master salary if available
                   const defaultSalary = (employee.salary || employee.salary_amount || 0).toString();
-                  const netSalary = defaultSalary && defaultSalary !== "0" ? defaultSalary : "";
-                  const tds = netSalary ? (parseFloat(netSalary) * 0.1).toFixed(2) : "0";
-                  const grossSalary = netSalary ? (parseFloat(netSalary) - parseFloat(tds)).toFixed(2) : "0";
-                  empData = { selected: false, net_salary: netSalary, tds: tds, gross_salary: grossSalary };
+                  const grossSalary = defaultSalary && defaultSalary !== "0" ? defaultSalary : "";
+                  const tds = grossSalary ? (parseFloat(grossSalary) * 0.1).toFixed(2) : "0";
+                  const netSalary = grossSalary ? (parseFloat(grossSalary) - parseFloat(tds)).toFixed(2) : "0";
+                  empData = { selected: false, gross_salary: grossSalary, tds: tds, net_salary: netSalary };
                 }
-                const netSalary = parseFloat(empData.net_salary) || 0;
-                const tds = netSalary ? (netSalary * 0.1).toFixed(2) : "0";
-                const grossSalary = netSalary ? (netSalary - parseFloat(tds)).toFixed(2) : "0";
+                const grossSalary = parseFloat(empData.gross_salary) || 0;
+                const tds = grossSalary ? (grossSalary * 0.1).toFixed(2) : "0";
+                const netSalary = grossSalary ? (grossSalary - parseFloat(tds)).toFixed(2) : "0";
                 
                 return (
                   <div key={employee.id} className="grid grid-cols-[auto_1fr_1fr_1fr] gap-4 items-center">
@@ -880,9 +1218,9 @@ export function SalaryList() {
                             ...batchStep2Data,
                             [employee.id]: {
                               selected: checked as boolean,
-                              net_salary: empData.net_salary || "",
+                              gross_salary: empData.gross_salary || "",
                               tds: empData.tds || "0",
-                              gross_salary: empData.gross_salary || "0",
+                              net_salary: empData.net_salary || "0",
                             },
                           });
                         }}
@@ -893,22 +1231,22 @@ export function SalaryList() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={empData.net_salary || ""}
+                      value={empData.gross_salary || ""}
                       onChange={(e) => {
-                        const newNetSalary = e.target.value;
-                        const newTds = newNetSalary ? (parseFloat(newNetSalary) * 0.1).toFixed(2) : "0";
-                        const newGrossSalary = newNetSalary ? (parseFloat(newNetSalary) - parseFloat(newTds)).toFixed(2) : "0";
+                        const newGrossSalary = e.target.value;
+                        const newTds = newGrossSalary ? (parseFloat(newGrossSalary) * 0.1).toFixed(2) : "0";
+                        const newNetSalary = newGrossSalary ? (parseFloat(newGrossSalary) - parseFloat(newTds)).toFixed(2) : "0";
                         setBatchStep2Data({
                           ...batchStep2Data,
                           [employee.id]: {
                             selected: empData.selected || false,
-                            net_salary: newNetSalary,
-                            tds: newTds,
                             gross_salary: newGrossSalary,
+                            tds: newTds,
+                            net_salary: newNetSalary,
                           },
                         });
                       }}
-                      placeholder="Enter salary"
+                      placeholder="Enter gross"
                       className="border-green-200 focus:border-green-400 focus:ring-green-400 h-10"
                       disabled={!empData.selected}
                     />
@@ -924,7 +1262,7 @@ export function SalaryList() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={grossSalary}
+                      value={netSalary}
                       readOnly
                       className="border-green-200 bg-green-50 h-10 text-green-700"
                     />

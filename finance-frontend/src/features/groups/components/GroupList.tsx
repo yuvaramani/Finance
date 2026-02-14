@@ -101,12 +101,12 @@ export function GroupList() {
   const handleEdit = async (group: Group) => {
     setIsLoadingGroup(true);
     setIsDialogOpen(true);
-    
+
     try {
       // Fetch fresh group data from the API
       const response = await groupService.getGroup(group.id);
       const freshGroupData = response?.data?.group || response?.group || response;
-      
+
       setEditingGroup(freshGroupData);
       setFormData({ name: freshGroupData.name || "" });
     } catch (error: any) {
@@ -148,7 +148,7 @@ export function GroupList() {
   ];
 
   return (
-    <div className="flex flex-col h-full gap-6 overflow-hidden">
+    <div className="flex flex-col h-full w-full flex-1 gap-6 overflow-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-green-800">Groups</h1>

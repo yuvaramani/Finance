@@ -16,9 +16,9 @@ class IncomeSource extends Model
 
     protected $appends = ['name'];
 
-    public function getNameAttribute(): string
+    public function getNameAttribute(): ?string
     {
-        return $this->attributes['source_name'];
+        return $this->attributes['source_name'] ?? null;
     }
 
     public function incomes(): HasMany

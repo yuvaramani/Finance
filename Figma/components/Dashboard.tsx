@@ -33,6 +33,8 @@ import { CashflowChart } from "./CashflowChart";
 import { ExpenseDonutChart } from "./ExpenseDonutChart";
 import { RecentTransactions } from "./RecentTransactions";
 import { EmployeeList } from "./EmployeeList";
+import { IncomeList } from "./IncomeList";
+import { SalaryList } from "./SalaryList";
 
 interface DashboardProps {
   onLogout: () => void;
@@ -284,9 +286,20 @@ export function Dashboard({ onLogout }: DashboardProps) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-140px)] overflow-auto">
         {activeMenu === "Employees" ? (
           <EmployeeList />
+        ) : activeMenu === "Accounts" ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl text-green-800 mb-2">Account Settings</h2>
+              <p className="text-green-600">Account management coming soon</p>
+            </div>
+          </div>
+        ) : activeMenu === "Income" ? (
+          <IncomeList />
+        ) : activeMenu === "Salary" ? (
+          <SalaryList />
         ) : activeMenu === "Dashboard" ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Sidebar */}

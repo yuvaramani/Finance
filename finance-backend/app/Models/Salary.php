@@ -14,14 +14,16 @@ class Salary extends Model
         'date',
         'employee_id',
         'account_id',
-        'salary',
+        'gross_salary',
         'tds',
+        'net_salary',
     ];
 
     protected $casts = [
         'date' => 'date',
-        'salary' => 'decimal:2',
+        'gross_salary' => 'decimal:2',
         'tds' => 'decimal:2',
+        'net_salary' => 'decimal:2',
     ];
 
     public function employee(): BelongsTo

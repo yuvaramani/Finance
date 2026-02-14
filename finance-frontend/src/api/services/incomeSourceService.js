@@ -1,26 +1,45 @@
-import axiosInstance from "../axios";
-import { ENDPOINTS } from "../endpoints";
+
+import axiosInstance from '../axios';
 
 export const incomeSourceService = {
-  async getSources(params = {}) {
-    const response = await axiosInstance.get(ENDPOINTS.INCOME_SOURCES.LIST, { params });
-    return response.data || response;
+  /**
+   * Get all income sources
+   */
+  async getIncomeSources() {
+    const response = await axiosInstance.get('/income-sources');
+    // Axios interceptor already returns response.data, so response is the unwrapped data
+    // Return the full response object so component can access response.data.sources
+    return response;
   },
 
-  async createSource(data) {
-    const response = await axiosInstance.post(ENDPOINTS.INCOME_SOURCES.CREATE, data);
-    return response.data || response;
+  /**
+   * Create a new income source
+   * @param {Object} data - { name }
+   */
+  async createIncomeSource(data) {
+    const response = await axiosInstance.post('/income-sources', data);
+    return response;
   },
 
-  async updateSource(id, data) {
-    const response = await axiosInstance.put(ENDPOINTS.INCOME_SOURCES.UPDATE(id), data);
-    return response.data || response;
+  /**
+   * Update an income source
+   * @param {number} id
+   * @param {Object} data - { name }
+   */
+  async updateIncomeSource(id, data) {
+    const response = await axiosInstance.put(`/income-sources/${id}`, data);
+    return response;
   },
 
-  async deleteSource(id) {
-    return axiosInstance.delete(ENDPOINTS.INCOME_SOURCES.DELETE(id));
-  },
+  /**
+   * Delete an income source
+   * @param {number} id
+   */
+  async deleteIncomeSource(id) {
+    console.log(`Service: Deleting income source ${id}`);
+    const response = await axiosInstance.delete(`/income-sources/${id}`);
+    console.log(`Service: Delete response for ${id}:`, response);
+    return response;
+  }
 };
-
-
 

@@ -25,5 +25,17 @@ export const salaryService = {
   async deleteSalary(id) {
     return axiosInstance.delete(ENDPOINTS.SALARIES.DELETE(id));
   },
+
+  async parseSalaryImport(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await axiosInstance.post('/salaries/parse', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data || response;
+  },
 };
 
