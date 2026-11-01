@@ -46,9 +46,45 @@ import { ExpenseCategoryList } from "@features/categories/components/ExpenseCate
 import { incomeService } from "@api/services/incomeService";
 import { salaryService } from "@api/services/salaryService";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@components/ui/select";
 interface DashboardProps {
   onLogout: () => void;
 }
+
+const FY_START_YEAR = 2024;
+const FY_END_YEAR = 2028;
+
+const financialYearOptions = Array.from(
+  { length: FY_END_YEAR - FY_START_YEAR + 1 },
+  (_, i) => {
+    const startYear = FY_START_YEAR + i;
+    return {
+      value: startYear,
+      label: `FY ${startYear}-${String(startYear + 1).slice(-2)}`,
+      // Indian financial year: 01 Apr (startYear) to 31 Mar (startYear + 1)
+      startDate: `${startYear}-04-01`,
+      endDate: `${startYear + 1}-03-31`,
+    };
+  }
+);
+
+const getDefaultFinancialYear = () => {
+  const now = new Date();
+  const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  return Math.min(Math.max(fyStart, FY_START_YEAR), FY_END_YEAR);
+};
+
+const isDateWithinRange = (dateValue: unknown, startDate: string, endDate: string) => {
+  if (!dateValue) return false;
+  const dateStr = String(dateValue).slice(0, 10);
+  return dateStr >= startDate && dateStr <= endDate;
+};
 
 // Mock data - Replace with API calls to Laravel backend
 const mockBankBalances = [
@@ -94,6 +130,12 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
+  const [selectedFY, setSelectedFY] = useState<number>(getDefaultFinancialYear);
+
+  const selectedFYOption = useMemo(
+    () => financialYearOptions.find((fy) => fy.value === selectedFY) || financialYearOptions[0],
+    [selectedFY]
+  );
 
   const { data: incomesData } = useQuery({
     queryKey: ["dashboard-incomes"],
@@ -115,7 +157,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
     (incomesData as any)?.data ||
     incomesData ||
     [];
-  const incomes = Array.isArray(incomesRaw) ? incomesRaw : [];
+  const allIncomes = Array.isArray(incomesRaw) ? incomesRaw : [];
 
   const salariesRaw =
     (salariesData as any)?.data?.salaries ||
@@ -123,7 +165,23 @@ export function Dashboard({ onLogout }: DashboardProps) {
     (salariesData as any)?.data ||
     salariesData ||
     [];
-  const salaries = Array.isArray(salariesRaw) ? salariesRaw : [];
+  const allSalaries = Array.isArray(salariesRaw) ? salariesRaw : [];
+
+  const incomes = useMemo(
+    () =>
+      allIncomes.filter((income: any) =>
+        isDateWithinRange(income?.date, selectedFYOption.startDate, selectedFYOption.endDate)
+      ),
+    [allIncomes, selectedFYOption]
+  );
+
+  const salaries = useMemo(
+    () =>
+      allSalaries.filter((salary: any) =>
+        isDateWithinRange(salary?.date, selectedFYOption.startDate, selectedFYOption.endDate)
+      ),
+    [allSalaries, selectedFYOption]
+  );
 
   const totalIncomeAmount = incomes.reduce((sum: number, income: any) => {
     return sum + Number(income.amount || 0);
@@ -521,6 +579,28 @@ export function Dashboard({ onLogout }: DashboardProps) {
           <ExpenseCategoryList />
         ) : (
           <div className="space-y-4">
+            <div className="flex items-center justify-end">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-green-700" />
+                <span className="text-sm text-green-700">Financial Year</span>
+                <Select
+                  value={String(selectedFY)}
+                  onValueChange={(value) => setSelectedFY(Number(value))}
+                >
+                  <SelectTrigger size="sm" className="w-[150px] border-green-200 bg-white text-green-800">
+                    <SelectValue placeholder="Select FY" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {financialYearOptions.map((fy) => (
+                      <SelectItem key={fy.value} value={String(fy.value)}>
+                        {fy.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
               <Card className="xl:col-span-9 border-green-100 bg-gradient-to-br from-white to-green-50/30 shadow-md hover:shadow-lg transition-shadow">
                 <CardHeader className="pb-2">
@@ -530,7 +610,10 @@ export function Dashboard({ onLogout }: DashboardProps) {
                     </div>
                     Income vs Salary
                   </CardTitle>
-                  <CardDescription>Left out % = (Income - Salary Gross) / Income</CardDescription>
+                  <CardDescription>
+                    {selectedFYOption.label} ({selectedFYOption.startDate.split("-").reverse().join(".")} to{" "}
+                    {selectedFYOption.endDate.split("-").reverse().join(".")}) &middot; Left out % = (Income - Salary Gross) / Income
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-1">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">

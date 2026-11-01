@@ -245,6 +245,7 @@ export function SalaryList() {
     mutationFn: (data: any) => salaryService.createSalary(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["tds-salaries"] });
       enqueueSnackbar("Salary payment created successfully", { variant: "success" });
       resetIndividualDialog();
     },
@@ -260,6 +261,7 @@ export function SalaryList() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["tds-salaries"] });
       enqueueSnackbar("Batch salary payments created successfully", { variant: "success" });
       resetBatchDialogs();
     },
@@ -273,6 +275,7 @@ export function SalaryList() {
       salaryService.updateSalary(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["tds-salaries"] });
       enqueueSnackbar("Salary payment updated successfully", { variant: "success" });
       resetIndividualDialog();
     },
@@ -285,6 +288,7 @@ export function SalaryList() {
     mutationFn: (id: number) => salaryService.deleteSalary(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["tds-salaries"] });
       enqueueSnackbar("Salary payment deleted successfully", { variant: "success" });
     },
     onError: (err: any) => {
@@ -316,6 +320,7 @@ export function SalaryList() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["tds-salaries"] });
       enqueueSnackbar("Imported salary payments successfully", { variant: "success" });
       resetImportDialog();
     },
